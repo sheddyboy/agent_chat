@@ -75,9 +75,13 @@ async def stream_graph(input, thread_id: str, span):
         async for mode, chunk in graph.astream(  # pyright: ignore[reportOptionalMemberAccess]
             input=input,
             config={"configurable": {"thread_id": thread_id}},
-            stream_mode=["messages", "updates", "custom"],
+            stream_mode=["messages", "updates", "custom", "tasks"],
         ):
-            if mode == "custom":
+            if mode == "tasks":
+                # Task results also arrive here; only starts lack a "result" key
+                if "result" not in chunk:
+                    yield event("node_start", node=chunk["name"])  # pyright: ignore[reportArgumentType]
+            elif mode == "custom":
                 # Tools emit fully formed events via get_stream_writer()
                 yield event(**chunk)  # pyright: ignore[reportCallIssue]
             elif mode == "messages":

@@ -6,10 +6,12 @@ export async function streamEvents(
   body: unknown,
   onEvent: (ev: ChatEvent) => void,
 ) {
+  // FormData sets its own multipart header, so only JSON bodies get one
+  const isForm = body instanceof FormData;
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: isForm ? undefined : { "Content-Type": "application/json" },
+    body: isForm ? body : JSON.stringify(body),
   });
   if (!res.ok || !res.body) throw new Error(`${res.status} ${res.statusText}`);
 

@@ -125,7 +125,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: an obvious injection attempt is blocked and logged.
 - [x] **8. Frontend: chat.** Next.js chat reading the SSE stream, markdown rendering with Streamdown, code, math, Mermaid.
   Done when: streaming chat works in the browser with rendered markdown.
-- [ ] **9. Frontend: panels.** Activity panel, Sources panel, approval card, documents page with upload progress.
+- [x] **9. Frontend: panels.** Activity panel, Sources panel, approval card, documents page with upload progress.
   Done when: every event type has a visible place in the UI.
 - [ ] **10. Polish.** Model switcher, per-chat tool toggles, "View trace" button, docker compose, README, demo video.
 
@@ -161,3 +161,7 @@ Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory
 - SSE is read with `fetch` and a ~25 line parser in `lib/sse.ts`, since `EventSource` cannot POST. No client library.
 - Streamdown v2 needs its plugins (`@streamdown/code`, `math`, `mermaid`) installed and passed in. Inline `$...$` math is on, so text with two dollar prices can occasionally render as math.
 - Phoenix is not a backend dependency; run it with `uvx --from arize-phoenix phoenix serve`. If it is down, span export retries slow every request, so start it first.
+- `node_start` comes from LangGraph's `tasks` stream mode: a task chunk without a `result` key is a node starting.
+- Each assistant message keeps its own non-token events; the Activity and Sources panels show the latest turn, or an older one when clicked.
+- A resumed run streams into the same assistant message. Sending is disabled while an approval is pending.
+- The documents page lists only uploads from the current browser session; there is no list endpoint yet.
