@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     default_model: str = "qwen3:8b"
     phoenix_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project: str = "agent-chat"
+    tavily_api_key: str = ""
 
 
 settings = Settings()

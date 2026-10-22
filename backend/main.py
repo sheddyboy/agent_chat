@@ -1,3 +1,5 @@
+import time
+
 from config import settings
 from events import event
 from fastapi import FastAPI
@@ -15,7 +17,8 @@ tracer_provider = register(
 tracer = tracer_provider.get_tracer(__name__)
 
 graph = build_graph()
-app = FastAPI()
+# FastAPI traces every request by default; we only want the LLM spans in Phoenix
+app = FastAPI(telemetry={"tracing": False})
 
 
 class ChatRequest(BaseModel):
@@ -32,16 +35,40 @@ async def stream_chat(req: ChatRequest):
             "messages": [HumanMessage(req.message)],
             "model": req.model or settings.default_model,
         }
+        tool_starts = {}  # tool_call id -> monotonic start time
+        answer = ""
         try:
-            async for chunk, _meta in graph.astream(
+            async for mode, chunk in graph.astream(
                 input={"messages": state["messages"], "model": state["model"]},
-                stream_mode="messages",
+                stream_mode=["messages", "updates"],
             ):
-                if isinstance(chunk, AIMessageChunk) and chunk.content:
-                    yield event("token", text=chunk.content)
+                if mode == "messages":
+                    msg, _meta = chunk
+                    if isinstance(msg, AIMessageChunk) and msg.text:
+                        answer += msg.text
+                        yield event("token", text=msg.text)
+                elif not isinstance(chunk, dict):
+                    continue
+                elif "agent" in chunk:
+                    for call in chunk["agent"]["messages"][-1].tool_calls:
+                        tool_starts[call["id"]] = time.monotonic()
+                        yield event(
+                            "tool_start", id=call["id"], name=call["name"], args=call["args"]
+                        )
+                elif "tools" in chunk:
+                    for msg in chunk["tools"]["messages"]:
+                        start = tool_starts.pop(msg.tool_call_id, time.monotonic())
+                        yield event(
+                            "tool_end",
+                            id=msg.tool_call_id,
+                            name=msg.name,
+                            output=str(msg.content)[:500],
+                            ms=round((time.monotonic() - start) * 1000),
+                        )
         except Exception as e:
             span.record_exception(e)
             yield event("error", message=str(e))
+        span.set_output(answer)
         yield event("done", trace_id=trace_id)
 
 

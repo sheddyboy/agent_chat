@@ -12,6 +12,7 @@ dependencies = [
     "openinference-instrumentation-langchain>=0.1.79",
     "pydantic-settings>=2.16.1",
     "sse-starlette>=3.5.0",
+    "tavily-python>=0.8.5",
     "uvicorn>=0.54.0",
 ]
 

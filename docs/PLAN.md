@@ -106,7 +106,7 @@ Backend slices are tested with `curl -N` before any frontend work.
 
 - [x] **1. Streaming chat + tracing.** Graph with `agent` only, `/chat` streams `token` and `done`.
   Done when: curl shows tokens live and the run appears in Phoenix.
-- [ ] **2. Tools.** `tools` node with `get_datetime`, `calculator`, `web_search` (SearXNG). `tool_start` / `tool_end` events.
+- [x] **2. Tools.** `tools` node with `get_datetime`, `calculator`, `web_search` (Tavily). `tool_start` / `tool_end` events.
   Done when: asking for the date or a sum triggers the right tool, visible in curl and Phoenix.
 - [ ] **3. Ingestion.** `/documents` upload, load, chunk, embed into Qdrant, `ingestion` events per stage.
   Done when: uploading a PDF streams progress and the chunks are in Qdrant.
@@ -134,3 +134,4 @@ Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory
 - RAG as a tool rather than a fixed graph path.
 - SQLite checkpointer for local-first simplicity.
 - Single event vocabulary with a `type` field for all streams.
+- Tavily for web search; the one online dependency, needs `TAVILY_API_KEY`.
