@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+.next/
+
+# Local data and secrets
+.env
+qdrant_data/
+uploads/
+*.db
