@@ -104,7 +104,7 @@ Source of events: `graph.astream(stream_mode=["messages", "updates", "custom"])`
 
 Backend slices are tested with `curl -N` before any frontend work.
 
-- [ ] **1. Streaming chat + tracing.** Graph with `agent` only, `/chat` streams `token` and `done`.
+- [x] **1. Streaming chat + tracing.** Graph with `agent` only, `/chat` streams `token` and `done`.
   Done when: curl shows tokens live and the run appears in Phoenix.
 - [ ] **2. Tools.** `tools` node with `get_datetime`, `calculator`, `web_search` (SearXNG). `tool_start` / `tool_end` events.
   Done when: asking for the date or a sum triggers the right tool, visible in curl and Phoenix.
