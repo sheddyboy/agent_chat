@@ -71,7 +71,6 @@ RAG is a tool (`search_documents`), not a fixed pipeline. The agent decides when
 ```python
 class ChatState(TypedDict):
     messages: Annotated[list, add_messages]
-    sources: list[dict]
     model: str
     enabled_tools: list[str]
 ```
@@ -114,7 +113,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: asking for the date or a sum triggers the right tool, visible in curl and Phoenix.
 - [x] **3. Ingestion.** `/documents` upload, load, chunk, embed into Qdrant, `ingestion` events per stage.
   Done when: uploading a PDF streams progress and the chunks are in Qdrant.
-- [ ] **4. Retrieval.** `search_documents` tool with hybrid search and reranking, `retrieval` events, `sources` in state.
+- [x] **4. Retrieval.** `search_documents` tool with hybrid search and reranking, `retrieval` events, sources as the ToolMessage artifact.
   Done when: questions about an uploaded doc are answered with the right chunks cited.
 - [ ] **5. Human-in-the-loop.** Checkpointer, `approval` node, `interrupt` event, `/resume` endpoint.
   Done when: a sensitive tool pauses the run, and approve/reject both behave correctly.
@@ -140,6 +139,9 @@ Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory
 - Ids are stable (sha256 of file bytes, uuid5 per chunk) so re-uploading a file overwrites rather than duplicates.
 - Page numbers from pymupdf4llm are 0-indexed; add 1 when showing citations.
 - RAG as a tool rather than a fixed graph path.
+- Hybrid search is one Qdrant query (dense + BM25 fused with RRF), top 20, then a cross-encoder reranks to top 5.
+- Sources ride on the `search_documents` ToolMessage `artifact` instead of a `sources` state key: no reducer conflicts on parallel calls, and they stay tied to their turn once the checkpointer lands.
+- Tools emit fully formed events through `get_stream_writer()`; `/chat` forwards every `custom` chunk as is.
 - SQLite checkpointer for local-first simplicity.
 - Single event vocabulary with a `type` field for all streams.
 - Tavily for web search; the one online dependency, needs `TAVILY_API_KEY`.

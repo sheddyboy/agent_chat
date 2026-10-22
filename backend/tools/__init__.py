@@ -2,8 +2,9 @@ from config import settings
 
 from tools.calculator import calculator
 from tools.datetime_tool import get_datetime
+from tools.search_documents import search_documents
 
-ALL_TOOLS = [get_datetime, calculator]
+ALL_TOOLS = [get_datetime, calculator, search_documents]
 
 # TavilyClient raises without a key, so only register it when one is set
 if settings.tavily_api_key:

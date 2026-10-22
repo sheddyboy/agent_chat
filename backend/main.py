@@ -44,9 +44,12 @@ async def stream_chat(req: ChatRequest):
         try:
             async for mode, chunk in graph.astream(
                 input={"messages": state["messages"], "model": state["model"]},
-                stream_mode=["messages", "updates"],
+                stream_mode=["messages", "updates", "custom"],
             ):
-                if mode == "messages":
+                if mode == "custom":
+                    # Tools emit fully formed events via get_stream_writer()
+                    yield event(**chunk)  # pyright: ignore[reportCallIssue]
+                elif mode == "messages":
                     msg, _meta = chunk
                     if isinstance(msg, AIMessageChunk) and msg.text:
                         answer += msg.text

@@ -18,5 +18,9 @@ class Settings(BaseSettings):
     chunk_overlap: int = 150
     upload_dir: str = "uploads"
 
+    retrieval_k: int = 20
+    rerank_top_n: int = 5
+    rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
+
 
 settings = Settings()
