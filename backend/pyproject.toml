@@ -8,6 +8,7 @@ dependencies = [
     "arize-phoenix-otel>=0.17.2",
     "fastapi>=0.159.1",
     "fastembed>=0.9.0",
+    "langchain-mcp-adapters>=0.3.2",
     "langchain-ollama>=1.1.0",
     "langchain-pymupdf4llm>=1.28.0",
     "langchain-qdrant>=1.1.0",

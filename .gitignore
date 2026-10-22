@@ -13,3 +13,4 @@ qdrant_data/
 uploads/
 notes/
 *.db
+workspace/

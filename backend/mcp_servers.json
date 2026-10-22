@@ -1,0 +1,12 @@
+{
+  "filesystem": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "workspace"]
+  },
+  "fetch": {
+    "transport": "stdio",
+    "command": "uvx",
+    "args": ["mcp-server-fetch"]
+  }
+}

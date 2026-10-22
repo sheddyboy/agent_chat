@@ -17,6 +17,8 @@ from langgraph.types import Command
 from phoenix.otel import register
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+from tools import ALL_TOOLS
+from tools.mcp_loader import load_mcp_tools
 
 tracer_provider = register(
     project_name=settings.phoenix_project,
@@ -31,6 +33,8 @@ graph = None  # built in lifespan once the checkpointer is open
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     global graph
+    # MCP tools join ALL_TOOLS before the graph builds its ToolNode
+    ALL_TOOLS.extend(await load_mcp_tools())
     async with AsyncSqliteSaver.from_conn_string(settings.checkpoint_db) as saver:
         graph = build_graph(saver)
         yield
@@ -99,7 +103,7 @@ async def stream_graph(input, thread_id: str, span):
                         "tool_end",
                         id=msg.tool_call_id,
                         name=msg.name,
-                        output=str(msg.content)[:500],
+                        output=msg.text[:500],  # .text also flattens MCP content blocks
                         ms=round((time.monotonic() - start) * 1000),
                     )
     except Exception as e:

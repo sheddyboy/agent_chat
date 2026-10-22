@@ -117,7 +117,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: questions about an uploaded doc are answered with the right chunks cited.
 - [x] **5. Human-in-the-loop.** Checkpointer, `approval` node, `interrupt` event, `/resume` endpoint.
   Done when: a sensitive tool pauses the run, and approve/reject both behave correctly.
-- [ ] **6. MCP.** Load servers from `mcp_servers.json` (start with Filesystem and Fetch).
+- [x] **6. MCP.** Load servers from `mcp_servers.json` (start with Filesystem and Fetch).
   Done when: the agent uses an MCP tool exactly like a local one.
 - [ ] **7. Input guard.** Prompt-injection classifier in `guard_input`.
   Done when: an obvious injection attempt is blocked and logged.
@@ -148,3 +148,7 @@ Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory
 - `save_note` is the first sensitive tool; more join `SENSITIVE_TOOLS` with one line each.
 - A reject answers every tool call in that AIMessage (each call needs a ToolMessage), then the agent adapts.
 - Root spans carry `session.id = thread_id`, so a chat and its resumes form one Phoenix session.
+- MCP servers live in `mcp_servers.json` in `MultiServerMCPClient` format and are loaded once at startup into `ALL_TOOLS`. A server that fails to start is logged and skipped.
+- MCP sessions are stateless (one stdio process per call). Simple, but each call pays the spawn cost (~20s for `npx` filesystem); persistent sessions can come later if it hurts.
+- The filesystem server is rooted at `backend/workspace/`. Its write tools (`write_file`, `edit_file`, `move_file`, `create_directory`) are in `SENSITIVE_TOOLS`.
+- `tool_end` output uses `msg.text` so MCP content blocks read like plain local tool output.

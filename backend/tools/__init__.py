@@ -8,7 +8,14 @@ from tools.search_documents import search_documents
 ALL_TOOLS = [get_datetime, calculator, search_documents, save_note]
 
 # Calls to these pause the run in the approval node until the user decides
-SENSITIVE_TOOLS = {"save_note"}
+SENSITIVE_TOOLS = {
+    "save_note",
+    # Filesystem MCP tools that change files
+    "write_file",
+    "edit_file",
+    "move_file",
+    "create_directory",
+}
 
 # TavilyClient raises without a key, so only register it when one is set
 if settings.tavily_api_key:
