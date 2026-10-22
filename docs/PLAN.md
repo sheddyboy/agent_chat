@@ -33,6 +33,7 @@ backend/
   main.py           # FastAPI app and routes
   config.py         # pydantic-settings
   graph.py          # build_graph(), nodes as plain functions
+  guard.py          # prompt-injection classifier (onnx)
   events.py         # event(type, **data) helper
   models.py         # task -> model name, cached loaders
   mcp_servers.json  # MCP servers, loaded at startup
@@ -59,7 +60,7 @@ START -> guard_input -> agent -> approval -> tools -> agent ... -> END
                           +-> END (no tool calls)
 ```
 
-- `guard_input`: prompt-injection check on the user message. Pass-through until slice 7.
+- `guard_input`: prompt-injection check on the user message. Blocked messages end the run with a refusal.
 - `agent`: binds enabled tools to `ChatOllama(model=state["model"])`, calls `llm.invoke()`.
 - `approval`: if any tool call is in `SENSITIVE_TOOLS`, `interrupt()` and wait. Reject adds a ToolMessage so the agent can adapt.
 - `tools`: prebuilt `ToolNode` with `ALL_TOOLS` plus MCP tools.
@@ -98,6 +99,7 @@ Every event is one JSON object with a `type` field.
 | `retrieval` | `query`, `hits: [{doc, page, score, text}]` |
 | `ingestion` | `doc_id`, `stage` (load/chunk/embed/store), `done`, `total` |
 | `interrupt` | `tool_calls`, `thread_id` |
+| `guard` | `blocked`, `score` |
 | `error` | `message` |
 | `done` | `trace_id`, `thread_id` |
 
@@ -119,7 +121,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: a sensitive tool pauses the run, and approve/reject both behave correctly.
 - [x] **6. MCP.** Load servers from `mcp_servers.json` (start with Filesystem and Fetch).
   Done when: the agent uses an MCP tool exactly like a local one.
-- [ ] **7. Input guard.** Prompt-injection classifier in `guard_input`.
+- [x] **7. Input guard.** Prompt-injection classifier in `guard_input`.
   Done when: an obvious injection attempt is blocked and logged.
 - [ ] **8. Frontend: chat.** Next.js chat reading the SSE stream, markdown rendering with Streamdown, code, math, Mermaid.
   Done when: streaming chat works in the browser with rendered markdown.
@@ -152,3 +154,6 @@ Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory
 - MCP sessions are stateless (one stdio process per call). Simple, but each call pays the spawn cost (~20s for `npx` filesystem); persistent sessions can come later if it hurts.
 - The filesystem server is rooted at `backend/workspace/`. Its write tools (`write_file`, `edit_file`, `move_file`, `create_directory`) are in `SENSITIVE_TOOLS`.
 - `tool_end` output uses `msg.text` so MCP content blocks read like plain local tool output.
+- Input guard is `protectai/deberta-v3-base-prompt-injection-v2` run with onnxruntime + tokenizers (no torch), blocking at score >= 0.9. Benign text mentioning "ignore" can score ~0.88, so the threshold stays high.
+- Only the user message is checked. Tool and RAG output are not (that would be a `guard_output` or per-tool check later).
+- A blocked turn ends with a refusal AIMessage (score in `response_metadata`) so thread history stays coherent, plus a `guard` event and a warning log line.

@@ -27,5 +27,8 @@ class Settings(BaseSettings):
     rerank_top_n: int = 5
     rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
 
+    guard_model: str = "protectai/deberta-v3-base-prompt-injection-v2"
+    guard_threshold: float = 0.9
+
 
 settings = Settings()
