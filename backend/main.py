@@ -8,6 +8,7 @@ from typing import Literal
 from config import settings
 from events import event
 from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from ingestion.pipeline import ingest
 from ingestion.store import count
@@ -42,6 +43,13 @@ async def lifespan(_app: FastAPI):
 
 # FastAPI traces every request by default; we only want the LLM spans in Phoenix
 app = FastAPI(lifespan=lifespan, telemetry={"tracing": False})
+# The frontend calls the API directly; a Next proxy could buffer the SSE stream
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class ChatRequest(BaseModel):

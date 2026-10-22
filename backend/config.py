@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     phoenix_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project: str = "agent-chat"
     tavily_api_key: str = ""
+    cors_origins: list[str] = ["http://localhost:3000"]
 
     qdrant_path: str = "qdrant_data"
     qdrant_collection: str = "documents"

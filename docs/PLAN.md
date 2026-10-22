@@ -123,7 +123,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: the agent uses an MCP tool exactly like a local one.
 - [x] **7. Input guard.** Prompt-injection classifier in `guard_input`.
   Done when: an obvious injection attempt is blocked and logged.
-- [ ] **8. Frontend: chat.** Next.js chat reading the SSE stream, markdown rendering with Streamdown, code, math, Mermaid.
+- [x] **8. Frontend: chat.** Next.js chat reading the SSE stream, markdown rendering with Streamdown, code, math, Mermaid.
   Done when: streaming chat works in the browser with rendered markdown.
 - [ ] **9. Frontend: panels.** Activity panel, Sources panel, approval card, documents page with upload progress.
   Done when: every event type has a visible place in the UI.
@@ -157,3 +157,7 @@ Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory
 - Input guard is `protectai/deberta-v3-base-prompt-injection-v2` run with onnxruntime + tokenizers (no torch), blocking at score >= 0.9. Benign text mentioning "ignore" can score ~0.88, so the threshold stays high.
 - Only the user message is checked. Tool and RAG output are not (that would be a `guard_output` or per-tool check later).
 - A blocked turn ends with a refusal AIMessage (score in `response_metadata`) so thread history stays coherent, plus a `guard` event and a warning log line.
+- The frontend calls the API directly with CORS (`cors_origins` in config) rather than through a Next proxy, which can buffer SSE.
+- SSE is read with `fetch` and a ~25 line parser in `lib/sse.ts`, since `EventSource` cannot POST. No client library.
+- Streamdown v2 needs its plugins (`@streamdown/code`, `math`, `mermaid`) installed and passed in. Inline `$...$` math is on, so text with two dollar prices can occasionally render as math.
+- Phoenix is not a backend dependency; run it with `uvx --from arize-phoenix phoenix serve`. If it is down, span export retries slow every request, so start it first.
