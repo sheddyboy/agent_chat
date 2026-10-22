@@ -10,5 +10,13 @@ class Settings(BaseSettings):
     phoenix_project: str = "agent-chat"
     tavily_api_key: str = ""
 
+    qdrant_path: str = "qdrant_data"
+    qdrant_collection: str = "documents"
+    embedding_model: str = "qwen3-embedding:0.6b"
+    sparse_model: str = "Qdrant/bm25"
+    chunk_size: int = 1000
+    chunk_overlap: int = 150
+    upload_dir: str = "uploads"
+
 
 settings = Settings()

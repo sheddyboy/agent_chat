@@ -16,8 +16,11 @@ A local-first, ChatGPT/Claude-style agentic chat platform. It showcases agent or
 | Backend | FastAPI, uv, sse-starlette |
 | Orchestration | LangGraph (plain function nodes, direct `llm.invoke()`, no LCEL) |
 | LLMs | Ollama via `ChatOllama` (qwen3, gpt-oss) |
-| Embeddings / rerank | sentence-transformers / fastembed, in-process |
-| Vector store | Qdrant (local) |
+| Embeddings | `qwen3-embedding:0.6b` via Ollama (dense), fastembed `Qdrant/bm25` (sparse) |
+| Rerank | fastembed `Xenova/ms-marco-MiniLM-L-6-v2`, in-process |
+| PDF loading | `langchain-pymupdf4llm` (markdown per page, Tesseract OCR for scans) |
+| Chunking | `MarkdownTextSplitter` from langchain-text-splitters |
+| Vector store | Qdrant local mode (`QdrantClient(path=...)`) via langchain-qdrant |
 | Checkpoints / threads | SQLite (`AsyncSqliteSaver`) |
 | MCP | langchain-mcp-adapters (`MultiServerMCPClient`) |
 | Observability | Phoenix (`arize-phoenix-otel` + `openinference-instrumentation-langchain`) |
@@ -34,7 +37,7 @@ backend/
   models.py         # task -> model name, cached loaders
   mcp_servers.json  # MCP servers, loaded at startup
   tools/            # one file per tool, ALL_TOOLS in __init__.py
-  ingestion/        # loader.py, chunking.py, embedding.py
+  ingestion/        # loader.py, chunking.py, store.py, pipeline.py
   retrieval/        # hybrid.py, rerank.py
 frontend/
 docs/
@@ -80,6 +83,7 @@ class ChatState(TypedDict):
 | POST | `/chat` | `thread_id`, `message`, `model`, `enabled_tools`. Returns an SSE stream |
 | POST | `/chat/{thread_id}/resume` | `{"action": "approve" \| "reject"}`. Returns an SSE stream |
 | POST | `/documents` | Upload. Returns an SSE stream of ingestion progress |
+| GET | `/documents/{doc_id}` | Chunk count for a document |
 | GET | `/threads/{thread_id}` | Thread history from the checkpointer |
 
 ## SSE events
@@ -108,7 +112,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: curl shows tokens live and the run appears in Phoenix.
 - [x] **2. Tools.** `tools` node with `get_datetime`, `calculator`, `web_search` (Tavily). `tool_start` / `tool_end` events.
   Done when: asking for the date or a sum triggers the right tool, visible in curl and Phoenix.
-- [ ] **3. Ingestion.** `/documents` upload, load, chunk, embed into Qdrant, `ingestion` events per stage.
+- [x] **3. Ingestion.** `/documents` upload, load, chunk, embed into Qdrant, `ingestion` events per stage.
   Done when: uploading a PDF streams progress and the chunks are in Qdrant.
 - [ ] **4. Retrieval.** `search_documents` tool with hybrid search and reranking, `retrieval` events, `sources` in state.
   Done when: questions about an uploaded doc are answered with the right chunks cited.
@@ -131,6 +135,10 @@ Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory
 ## Decisions log
 
 - Qdrant over pgvector.
+- Qdrant in local mode, no Docker. The folder is locked to one process, so inspect it through the API or with the server stopped.
+- Dense and sparse (BM25) vectors are both stored at ingest so hybrid search needs no re-ingestion.
+- Ids are stable (sha256 of file bytes, uuid5 per chunk) so re-uploading a file overwrites rather than duplicates.
+- Page numbers from pymupdf4llm are 0-indexed; add 1 when showing citations.
 - RAG as a tool rather than a fixed graph path.
 - SQLite checkpointer for local-first simplicity.
 - Single event vocabulary with a `type` field for all streams.
