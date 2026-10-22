@@ -11,4 +11,5 @@ node_modules/
 .env
 qdrant_data/
 uploads/
+notes/
 *.db

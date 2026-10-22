@@ -36,7 +36,7 @@ backend/
   events.py         # event(type, **data) helper
   models.py         # task -> model name, cached loaders
   mcp_servers.json  # MCP servers, loaded at startup
-  tools/            # one file per tool, ALL_TOOLS in __init__.py
+  tools/            # one file per tool, ALL_TOOLS and SENSITIVE_TOOLS in __init__.py
   ingestion/        # loader.py, chunking.py, store.py, pipeline.py
   retrieval/        # hybrid.py, rerank.py
 frontend/
@@ -99,7 +99,7 @@ Every event is one JSON object with a `type` field.
 | `ingestion` | `doc_id`, `stage` (load/chunk/embed/store), `done`, `total` |
 | `interrupt` | `tool_calls`, `thread_id` |
 | `error` | `message` |
-| `done` | `trace_id` |
+| `done` | `trace_id`, `thread_id` |
 
 Source of events: `graph.astream(stream_mode=["messages", "updates", "custom"])`. Tokens come from `messages`, node/tool/interrupt events from `updates`, and retrieval/ingestion events from `custom` via `get_stream_writer()` inside tools.
 
@@ -115,7 +115,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: uploading a PDF streams progress and the chunks are in Qdrant.
 - [x] **4. Retrieval.** `search_documents` tool with hybrid search and reranking, `retrieval` events, sources as the ToolMessage artifact.
   Done when: questions about an uploaded doc are answered with the right chunks cited.
-- [ ] **5. Human-in-the-loop.** Checkpointer, `approval` node, `interrupt` event, `/resume` endpoint.
+- [x] **5. Human-in-the-loop.** Checkpointer, `approval` node, `interrupt` event, `/resume` endpoint.
   Done when: a sensitive tool pauses the run, and approve/reject both behave correctly.
 - [ ] **6. MCP.** Load servers from `mcp_servers.json` (start with Filesystem and Fetch).
   Done when: the agent uses an MCP tool exactly like a local one.
@@ -145,3 +145,6 @@ Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory
 - SQLite checkpointer for local-first simplicity.
 - Single event vocabulary with a `type` field for all streams.
 - Tavily for web search; the one online dependency, needs `TAVILY_API_KEY`.
+- `save_note` is the first sensitive tool; more join `SENSITIVE_TOOLS` with one line each.
+- A reject answers every tool call in that AIMessage (each call needs a ToolMessage), then the agent adapts.
+- Root spans carry `session.id = thread_id`, so a chat and its resumes form one Phoenix session.
