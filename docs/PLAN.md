@@ -149,7 +149,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: a refresh reopens any chat with its messages, sources and activity.
 - [ ] **13. Attachments.** Attach PDFs to a chat like Claude's `+` button; questions only search the attached files.
   - [x] **13a. Backend scoping.** `documents` table with ingestion status, `uploads/{doc_id}/name`, `GET /documents`, `attachments` (doc ids) on `/chat` merged into thread state, search filtered to them, a system note naming the files.
-  - [ ] **13b. Composer upload.** `+` button, upload chips with progress, send gating.
+  - [x] **13b. Composer upload.** `+` button and drag-and-drop (PDFs only), chips with ingestion progress, Send blocked while any chip is uploading or failed, chips on sent and reopened messages. Upload logic shared with the Documents page in `lib/upload.ts`.
   - [ ] **13c. Library picker.** "From library" in the `+` menu, persistent Documents page, "Ask about this".
   Done when: two chats with different attachments get answers only from their own files.
 
@@ -174,6 +174,7 @@ Deep research subgraph, long-term memory, conversation branching, artifacts pane
 - Titles come from the first user message only (like Claude), so they also work when the first turn stops at an approval. The frontend treats `title` like `done` when checking for a pending interrupt.
 - Questions only search the chat's attached documents (`search_scope = "attachments"`). A chat with none is not offered `search_documents` at all. Evals set `search_scope = "all"` to search the whole HotpotQA collection.
 - Attachment names come from the `documents` table, never from the client. Each user message keeps its turn's attachments in `additional_kwargs` so history can show them.
+- The frontend only accepts PDFs (picker and drop). The backend itself would also ingest anything PyMuPDF opens, such as `.txt`.
 - Uploads live in `uploads/{doc_id}/{name}`; the `documents` row tracks ingestion status so the library can show failed or in-progress files.
 - Recent chats use keyset paging on `(updated_at, thread_id)` so pages stay stable while new chats arrive.
 - The URL decides which chat is open (`/` new, `/c/{id}` saved). `Chat` reads `usePathname()` instead of route params, so a new chat can take its URL with `history.replaceState` after the first `done` without remounting. Next 16 keeps visited routes mounted but hidden (`Activity`), so state must follow the URL, not mount.

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AlertCircle, CheckCircle2, FileText, Menu, Upload } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
-import { streamEvents, type ChatEvent } from "@/lib/sse";
+import { uploadDocument } from "@/lib/upload";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const STAGES = ["load", "chunk", "embed", "store"];
@@ -30,30 +30,10 @@ export default function Documents() {
 
   async function upload(file: File) {
     setUploads((prev) => [{ name: file.name, done: 0, total: 0 }, ...prev.filter((u) => u.name !== file.name)]);
-    const form = new FormData();
-    form.append("file", file);
-    let docId = "";
-
-    function onEvent(ev: ChatEvent) {
-      if (ev.type === "ingestion") {
-        docId = ev.doc_id as string;
-        update(file.name, {
-          docId,
-          stage: ev.stage as string,
-          done: ev.done as number,
-          total: ev.total as number,
-        });
-      } else if (ev.type === "error") {
-        update(file.name, { error: ev.message as string });
-      }
-    }
-
     try {
-      await streamEvents(`${API}/documents`, form, onEvent);
-      if (docId) {
-        const info = await fetch(`${API}/documents/${docId}`).then((r) => r.json());
-        update(file.name, { chunks: info.chunks });
-      }
+      const docId = await uploadDocument(file, (p) => update(file.name, p));
+      const info = await fetch(`${API}/documents/${docId}`).then((r) => r.json());
+      update(file.name, { chunks: info.chunks });
     } catch (e) {
       update(file.name, { error: (e as Error).message });
     }

@@ -11,6 +11,7 @@ import { mermaid } from "@streamdown/mermaid";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
 import { ActivityPanel } from "@/components/activity-panel";
+import { AttachButton, AttachmentChip, DraftChip, type Attachment, type Draft } from "@/components/attachments";
 import { ApprovalCard } from "@/components/approval-card";
 import { Sidebar } from "@/components/sidebar";
 import { SourcesPanel } from "@/components/sources-panel";
@@ -19,6 +20,7 @@ import { ToolPicker, type Tool } from "@/components/tool-picker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { streamEvents, type ChatEvent } from "@/lib/sse";
+import { uploadDocument } from "@/lib/upload";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 // Models write inline math as $...$, which the default plugin ignores
@@ -36,6 +38,7 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   events: ChatEvent[];
+  attachments?: Attachment[];
   startedAt?: number;
   thoughtMs?: number;
 };
@@ -57,6 +60,8 @@ function chatTitle(messages: Message[]) {
 export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  // Files picked for the next message; they upload as soon as they are picked
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [threadId, setThreadId] = useState<string | null>(null);
   // The backend title once it exists; until then the first message stands in
   const [title, setTitle] = useState<string | null>(null);
@@ -104,6 +109,7 @@ export function Chat() {
     setStatus("loading");
     setSelected(null);
     setMessages([]);
+    setDrafts([]);
     const res = await fetch(`${API}/threads/${id}`);
     if (opening.current !== id) return; // the user opened another chat meanwhile
     if (!res.ok) return setStatus("missing");
@@ -122,6 +128,7 @@ export function Chat() {
     setStatus("ready");
     setSelected(null);
     setMessages([]);
+    setDrafts([]);
     setThreadId(null);
     setTitle(null);
     setModel(defaultModel);
@@ -194,18 +201,37 @@ export function Chat() {
     setStreaming(false);
   }
 
+  function updateDraft(key: string, change: Partial<Draft>) {
+    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...change } : d)));
+  }
+
+  function attach(files: File[]) {
+    for (const file of files) {
+      const key = crypto.randomUUID();
+      setDrafts((prev) => [...prev, { key, name: file.name, done: 0, total: 0, ready: false }]);
+      // A chip removed mid-upload just stops updating; the file still lands in the library
+      uploadDocument(file, (p) => updateDraft(key, p))
+        .then((docId) => updateDraft(key, { docId, ready: true }))
+        .catch((e) => updateDraft(key, { error: (e as Error).message }));
+    }
+  }
+
   const last = messages[messages.length - 1];
   const canThink = models.find((m) => m.name === model)?.thinking ?? false;
   const pending = last ? pendingInterrupt(last.events) : null;
+  // A failed chip also blocks sending until it is removed
+  const uploading = drafts.some((d) => !d.ready);
 
   async function send() {
     const message = input.trim();
-    if (!message || streaming || pending) return;
+    if (!message || streaming || pending || uploading) return;
+    const attachments = drafts.map((d) => ({ doc_id: d.docId!, name: d.name }));
     setInput("");
+    setDrafts([]);
     setSelected(null);
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: message, events: [] },
+      { role: "user", content: message, events: [], attachments },
       { role: "assistant", content: "", events: [], startedAt: Date.now() },
     ]);
     await run(`${API}/chat`, {
@@ -213,6 +239,7 @@ export function Chat() {
       thread_id: threadId,
       model,
       enabled_tools: enabledTools,
+      attachments: attachments.map((a) => a.doc_id),
       // A chat switched to a model that can't think must not ask it to
       think: think && canThink,
     });
@@ -236,7 +263,20 @@ export function Chat() {
         e.preventDefault();
         send();
       }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        // Same rule as the + button's picker: PDFs only
+        attach(Array.from(e.dataTransfer.files).filter((f) => f.name.toLowerCase().endsWith(".pdf")));
+      }}
     >
+      {drafts.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-3 pt-3">
+          {drafts.map((d) => (
+            <DraftChip key={d.key} draft={d} onRemove={() => setDrafts((prev) => prev.filter((x) => x.key !== d.key))} />
+          ))}
+        </div>
+      )}
       <Textarea
         value={input}
         onChange={(e) => setInput(e.target.value)}
@@ -252,6 +292,7 @@ export function Chat() {
         className="max-h-48 min-h-14 resize-none border-0 bg-transparent px-4 pt-3.5 shadow-none focus-visible:ring-0 dark:bg-transparent"
       />
       <div className="flex items-center gap-1 px-2 pb-2">
+        <AttachButton onFiles={attach} />
         <select
           value={model}
           onChange={(e) => setModel(e.target.value)}
@@ -286,7 +327,7 @@ export function Chat() {
           size="icon-sm"
           aria-label="Send"
           className="ml-auto rounded-full"
-          disabled={streaming || !!pending || !input.trim()}
+          disabled={streaming || !!pending || uploading || !input.trim()}
         >
           {streaming ? <Loader2 className="animate-spin" /> : <ArrowUp />}
         </Button>
@@ -361,11 +402,17 @@ export function Chat() {
               <div className="mx-auto max-w-3xl space-y-8 px-4 py-6">
                 {messages.map((m, i) =>
                   m.role === "user" ? (
-                    <div
-                      key={i}
-                      className="ml-auto w-fit max-w-[80%] rounded-2xl bg-muted px-4 py-2 whitespace-pre-wrap"
-                    >
-                      {m.content}
+                    <div key={i} className="flex flex-col items-end gap-1.5">
+                      {!!m.attachments?.length && (
+                        <div className="flex max-w-[80%] flex-wrap justify-end gap-1.5">
+                          {m.attachments.map((a) => (
+                            <AttachmentChip key={a.doc_id} attachment={a} />
+                          ))}
+                        </div>
+                      )}
+                      <div className="w-fit max-w-[80%] rounded-2xl bg-muted px-4 py-2 whitespace-pre-wrap">
+                        {m.content}
+                      </div>
                     </div>
                   ) : (
                     <div
