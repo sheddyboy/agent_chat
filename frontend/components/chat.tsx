@@ -42,10 +42,11 @@ type Message = {
 // thinking: Ollama reports the model can reason before answering
 type Model = { name: string; thinking: boolean };
 
-// The pending interrupt of a turn: nothing but "done" has arrived after it
+// The pending interrupt of a turn: nothing but "done" (and a new chat's "title")
+// has arrived after it
 function pendingInterrupt(events: ChatEvent[]) {
   const i = events.findLastIndex((e) => e.type === "interrupt");
-  if (i === -1 || events.slice(i + 1).some((e) => e.type !== "done")) return null;
+  if (i === -1 || events.slice(i + 1).some((e) => e.type !== "done" && e.type !== "title")) return null;
   return events[i];
 }
 
@@ -57,6 +58,8 @@ export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [threadId, setThreadId] = useState<string | null>(null);
+  // The backend title once it exists; until then the first message stands in
+  const [title, setTitle] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [tab, setTab] = useState<"activity" | "sources">("activity");
@@ -107,6 +110,7 @@ export function Chat() {
     const d = await res.json();
     setMessages(d.messages);
     setThreadId(id);
+    setTitle(d.title);
     if (d.model) setModel(d.model);
     setEnabledTools(d.enabled_tools);
     setThink(d.think);
@@ -119,6 +123,7 @@ export function Chat() {
     setSelected(null);
     setMessages([]);
     setThreadId(null);
+    setTitle(null);
     setModel(defaultModel);
     setEnabledTools(null);
     setThink(false);
@@ -175,6 +180,7 @@ export function Chat() {
       setThreadId(ev.thread_id as string);
       setListVersion((v) => v + 1);
     }
+    if (ev.type === "title") setTitle(ev.title as string);
     if (ev.type === "error") appendToLast(`\n\n**Error:** ${ev.message}`);
   }
 
@@ -303,7 +309,7 @@ export function Chat() {
           <Button variant="ghost" size="icon-sm" aria-label="Open sidebar" className="md:hidden" onClick={() => setShowSidebar(true)}>
             <Menu />
           </Button>
-          <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{chatTitle(messages)}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{title ?? chatTitle(messages)}</h1>
           {messages.length > 0 && (
             <Button
               variant="ghost"

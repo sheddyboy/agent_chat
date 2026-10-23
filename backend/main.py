@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 from config import settings
-from db import delete_thread, get_thread, init_db, list_threads, touch_thread
+from db import delete_thread, get_thread, init_db, list_threads, set_title, touch_thread
 from events import event
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +23,7 @@ from phoenix.otel import register
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 from tools import ALL_TOOLS, SENSITIVE_TOOLS
+from titles import make_title
 from tools.mcp_loader import load_mcp_tools
 
 tracer_provider = register(
@@ -69,8 +70,11 @@ class ResumeRequest(BaseModel):
     action: Literal["approve", "reject"]
 
 
-async def stream_graph(input, thread_id: str, span):
-    """Run the graph on a thread and turn its stream into SSE events."""
+async def stream_graph(input, thread_id: str, span, first_message: str | None = None):
+    """Run the graph on a thread and turn its stream into SSE events.
+
+    `first_message` is set on a thread's first turn, which also gets a title.
+    """
     trace_id = format(span.get_span_context().trace_id, "032x")
     # Groups a chat and its resumes into one Phoenix session
     span.set_attribute("session.id", thread_id)
@@ -135,12 +139,17 @@ async def stream_graph(input, thread_id: str, span):
         span.record_exception(e)
         yield event("error", message=str(e))
     span.set_output(answer)
+    # Before done, which the frontend expects to be last (an interrupt sits right before it)
+    if first_message and (title := await make_title(first_message)):
+        set_title(thread_id, title)
+        yield event("title", title=title, thread_id=thread_id)
     yield event("done", trace_id=trace_id, thread_id=thread_id)
 
 
 async def stream_chat(req: ChatRequest):
     thread_id = req.thread_id or str(uuid.uuid4())
-    touch_thread(thread_id, req.message[:60])
+    is_new = get_thread(thread_id) is None
+    touch_thread(thread_id, req.message[:60])  # placeholder title until make_title's
     with tracer.start_as_current_span("chat", openinference_span_kind="chain") as span:
         span.set_input(req.message)
         input = {
@@ -151,7 +160,7 @@ async def stream_chat(req: ChatRequest):
         # Left out when None so the thread keeps its earlier choice
         if req.enabled_tools is not None:
             input["enabled_tools"] = req.enabled_tools
-        async for ev in stream_graph(input, thread_id, span):
+        async for ev in stream_graph(input, thread_id, span, req.message if is_new else None):
             yield ev
 
 

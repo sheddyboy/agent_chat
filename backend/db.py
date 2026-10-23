@@ -44,6 +44,11 @@ def touch_thread(thread_id: str, title: str):
         )
 
 
+def set_title(thread_id: str, title: str):
+    with closing(connect()) as conn, conn:
+        conn.execute("UPDATE threads SET title = ? WHERE thread_id = ?", (title, thread_id))
+
+
 def get_thread(thread_id: str) -> dict | None:
     with closing(connect()) as conn:
         row = conn.execute("SELECT * FROM threads WHERE thread_id = ?", (thread_id,)).fetchone()

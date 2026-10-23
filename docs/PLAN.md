@@ -104,6 +104,7 @@ Every event is one JSON object with a `type` field.
 | `ingestion` | `doc_id`, `stage` (load/chunk/embed/store), `done`, `total` |
 | `interrupt` | `tool_calls`, `thread_id` |
 | `guard` | `blocked`, `score` |
+| `title` | `title`, `thread_id`. First turn of a new chat only, sent right before `done` |
 | `error` | `message` |
 | `done` | `trace_id`, `thread_id` |
 
@@ -138,10 +139,10 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **11c. Guard.** `injection_score` on `deepset/prompt-injections`, precision, recall and false positive rate at several thresholds.
   - [x] **11d. Tools.** 31 written prompts across every local tool plus no-tool cases, expected tool vs first tool call.
   Done when: each suite runs with one `uv run python -m evals.<suite>` and shows up as experiments in Phoenix.
-- [ ] **12. Chat persistence.** Chats survive a reload, like Claude: a URL per chat, paged recents, delete.
+- [x] **12. Chat persistence.** Chats survive a reload, like Claude: a URL per chat, paged recents, delete.
   - [x] **12a. Backend threads.** `db.py` with a `threads` table in `app.db`, `GET /threads` (keyset paging), `GET /threads/{id}` (history rebuilt by `history.py`), `DELETE /threads/{id}`.
   - [x] **12b. Frontend chats.** `/c/[id]` route, sidebar loads paged recents from the backend (infinite scroll), open and delete with inline confirm.
-  - [ ] **12c. Auto titles.** Short LLM title after the first turn, `title` SSE event.
+  - [x] **12c. Auto titles.** `titles.py` asks the default model for a 3 to 6 word title from the first user message, saved and sent as a `title` event.
   Done when: a refresh reopens any chat with its messages, sources and activity.
 - [ ] **13. Attachments.** Attach PDFs to a chat like Claude's `+` button; questions only search the attached files.
   - [ ] **13a. Backend scoping.** `documents` table, `uploads/{doc_id}/name`, `GET /documents`, `attachments` in state, filtered search.
@@ -167,6 +168,7 @@ Deep research subgraph, long-term memory, conversation branching, artifacts pane
 - SQLite checkpointer for local-first simplicity.
 - One SQLite file (`app.db`) holds LangGraph's checkpoints and our own tables; our code uses stdlib `sqlite3` with a short-lived connection per call.
 - The checkpointer is the source of truth for messages. The `threads` table is only an index for the sidebar; `GET /threads/{id}` rebuilds the UI messages and events from the checkpoint (no `ms` or `trace_id`, those are not stored).
+- Titles come from the first user message only (like Claude), so they also work when the first turn stops at an approval. The frontend treats `title` like `done` when checking for a pending interrupt.
 - Recent chats use keyset paging on `(updated_at, thread_id)` so pages stay stable while new chats arrive.
 - The URL decides which chat is open (`/` new, `/c/{id}` saved). `Chat` reads `usePathname()` instead of route params, so a new chat can take its URL with `history.replaceState` after the first `done` without remounting. Next 16 keeps visited routes mounted but hidden (`Activity`), so state must follow the URL, not mount.
 - Single event vocabulary with a `type` field for all streams.
