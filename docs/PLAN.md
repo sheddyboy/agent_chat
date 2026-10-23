@@ -132,7 +132,7 @@ Backend slices are tested with `curl -N` before any frontend work.
 - [ ] **10. Polish.** Model switcher, per-chat tool toggles, "View trace" button, docker compose, README, demo video.
 - [ ] **11. Evals.** One suite per component in `backend/evals/`, public datasets, our own evaluators, run as Phoenix experiments.
   - [x] **11a. Retrieval.** HotpotQA subset in a separate Qdrant folder, hit@5, recall@5, MRR, rerank on vs off.
-  - [ ] **11b. Answers.** Full graph with `search_documents`, contains-answer plus a faithfulness judge.
+  - [x] **11b. Answers.** Full graph with `search_documents` and a "Based on the documents" prefix, used-search, contains-answer, answer-recall and a faithfulness judge.
   - [ ] **11c. Guard.** `injection_score` on `deepset/prompt-injections`, precision and recall.
   - [ ] **11d. Tools.** About 30 written prompts, expected tool vs first tool call.
   Done when: each suite runs with one `uv run python -m evals.<suite>` and shows up as experiments in Phoenix.

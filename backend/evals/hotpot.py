@@ -9,7 +9,10 @@ from langchain_core.documents import Document
 from phoenix.client import Client
 
 DATASET = "hotpot-retrieval-v1"
+ANSWERS_DATASET = "hotpot-answers-v1"
 SIZE = 200
+# Answer runs go through the full graph plus a judge, so they use a smaller slice
+ANSWERS_SIZE = 50
 BATCH = 64
 
 
@@ -41,7 +44,7 @@ def ingest(docs: list[Document]) -> None:
         print(f"embedded {min(i + BATCH, len(docs))}/{len(docs)}")
 
 
-def upload(rows) -> None:
+def upload(rows, name: str) -> None:
     examples = [
         {
             "id": row["id"],
@@ -54,8 +57,8 @@ def upload(rows) -> None:
         }
         for row in rows
     ]
-    Client().datasets.create_dataset(name=DATASET, examples=examples)
-    print(f"uploaded {len(examples)} examples to Phoenix dataset {DATASET}")
+    Client().datasets.create_dataset(name=name, examples=examples)
+    print(f"uploaded {len(examples)} examples to Phoenix dataset {name}")
 
 
 def main() -> None:
@@ -63,7 +66,8 @@ def main() -> None:
     docs = passages(rows)
     print(f"{len(rows)} questions, {len(docs)} passages")
     ingest(docs)
-    upload(rows)
+    upload(rows, DATASET)
+    upload(rows.select(range(ANSWERS_SIZE)), ANSWERS_DATASET)
 
 
 if __name__ == "__main__":
