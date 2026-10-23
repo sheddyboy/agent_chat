@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Brain, Loader2, Menu, PanelRight, Sparkles, X } from "lucide-react";
 import { Streamdown } from "streamdown";
@@ -11,7 +11,7 @@ import { mermaid } from "@streamdown/mermaid";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
 import { ActivityPanel } from "@/components/activity-panel";
-import { AttachButton, AttachmentChip, DraftChip, type Attachment, type Draft } from "@/components/attachments";
+import { AttachMenu, AttachmentChip, DraftChip, type Attachment, type Draft, type LibraryDoc } from "@/components/attachments";
 import { ApprovalCard } from "@/components/approval-card";
 import { Sidebar } from "@/components/sidebar";
 import { SourcesPanel } from "@/components/sources-panel";
@@ -87,6 +87,8 @@ export function Chat() {
   // The URL decides what is open: "/" is a new chat, "/c/{id}" a saved one
   const pathname = usePathname();
   const urlId = pathname.startsWith("/c/") ? pathname.slice(3) : null;
+  // "Ask about this" on the Documents page opens /?attach={doc_id}
+  const attachId = useSearchParams().get("attach");
 
   useEffect(() => {
     // The pane is an overlay on small screens, so start it closed there
@@ -146,6 +148,17 @@ export function Chat() {
     // Only a URL change should open or reset a chat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlId]);
+
+  useEffect(() => {
+    if (!attachId || urlId) return;
+    // Drop the param first so a refresh does not attach the file again
+    window.history.replaceState(null, "", "/");
+    fetch(`${API}/documents/${attachId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      // Add-only: dev mode runs this effect twice, and a toggle would undo itself
+      .then((doc: LibraryDoc | null) => doc?.status === "ready" && addFromLibrary(doc));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachId]);
 
   useEffect(() => {
     // A new chat gets its URL once the backend has assigned the thread
@@ -214,6 +227,20 @@ export function Chat() {
         .then((docId) => updateDraft(key, { docId, ready: true }))
         .catch((e) => updateDraft(key, { error: (e as Error).message }));
     }
+  }
+
+  // Library files are already ingested, so their chips are ready at once
+  function addFromLibrary(doc: LibraryDoc) {
+    setDrafts((prev) =>
+      prev.some((d) => d.docId === doc.doc_id)
+        ? prev
+        : [...prev, { key: doc.doc_id, name: doc.name, docId: doc.doc_id, done: 0, total: 0, ready: true }],
+    );
+  }
+
+  function toggleLibrary(doc: LibraryDoc) {
+    if (drafts.some((d) => d.docId === doc.doc_id)) setDrafts((prev) => prev.filter((d) => d.docId !== doc.doc_id));
+    else addFromLibrary(doc);
   }
 
   const last = messages[messages.length - 1];
@@ -292,7 +319,11 @@ export function Chat() {
         className="max-h-48 min-h-14 resize-none border-0 bg-transparent px-4 pt-3.5 shadow-none focus-visible:ring-0 dark:bg-transparent"
       />
       <div className="flex items-center gap-1 px-2 pb-2">
-        <AttachButton onFiles={attach} />
+        <AttachMenu
+          onFiles={attach}
+          selected={drafts.flatMap((d) => (d.docId ? [d.docId] : []))}
+          onToggle={toggleLibrary}
+        />
         <select
           value={model}
           onChange={(e) => setModel(e.target.value)}

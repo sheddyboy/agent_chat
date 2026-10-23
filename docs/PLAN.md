@@ -147,10 +147,10 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **12b. Frontend chats.** `/c/[id]` route, sidebar loads paged recents from the backend (infinite scroll), open and delete with inline confirm.
   - [x] **12c. Auto titles.** `titles.py` asks the default model for a 3 to 6 word title from the first user message, saved and sent as a `title` event.
   Done when: a refresh reopens any chat with its messages, sources and activity.
-- [ ] **13. Attachments.** Attach PDFs to a chat like Claude's `+` button; questions only search the attached files.
+- [x] **13. Attachments.** Attach PDFs to a chat like Claude's `+` button; questions only search the attached files.
   - [x] **13a. Backend scoping.** `documents` table with ingestion status, `uploads/{doc_id}/name`, `GET /documents`, `attachments` (doc ids) on `/chat` merged into thread state, search filtered to them, a system note naming the files.
   - [x] **13b. Composer upload.** `+` button and drag-and-drop (PDFs only), chips with ingestion progress, Send blocked while any chip is uploading or failed, chips on sent and reopened messages. Upload logic shared with the Documents page in `lib/upload.ts`.
-  - [ ] **13c. Library picker.** "From library" in the `+` menu, persistent Documents page, "Ask about this".
+  - [x] **13c. Library picker.** The `+` opens a menu: Upload PDFs, or From library (searchable list of ready docs, toggles chips that are ready at once). The Documents page lists the whole library with status, and "Ask about this" opens `/?attach={doc_id}`.
   Done when: two chats with different attachments get answers only from their own files.
 
 ## Later ideas
@@ -175,6 +175,7 @@ Deep research subgraph, long-term memory, conversation branching, artifacts pane
 - Questions only search the chat's attached documents (`search_scope = "attachments"`). A chat with none is not offered `search_documents` at all. Evals set `search_scope = "all"` to search the whole HotpotQA collection.
 - Attachment names come from the `documents` table, never from the client. Each user message keeps its turn's attachments in `additional_kwargs` so history can show them.
 - The frontend only accepts PDFs (picker and drop). The backend itself would also ingest anything PyMuPDF opens, such as `.txt`.
+- `/?attach={doc_id}` is read with `useSearchParams` (so `/` renders `Chat` inside `<Suspense>`), adds the chip add-only (dev mode runs effects twice) and is cleared with `replaceState` so a refresh does not attach again.
 - Uploads live in `uploads/{doc_id}/{name}`; the `documents` row tracks ingestion status so the library can show failed or in-progress files.
 - Recent chats use keyset paging on `(updated_at, thread_id)` so pages stay stable while new chats arrive.
 - The URL decides which chat is open (`/` new, `/c/{id}` saved). `Chat` reads `usePathname()` instead of route params, so a new chat can take its URL with `history.replaceState` after the first `done` without remounting. Next 16 keeps visited routes mounted but hidden (`Activity`), so state must follow the URL, not mount.
