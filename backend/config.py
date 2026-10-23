@@ -6,6 +6,12 @@ class Settings(BaseSettings):
 
     ollama_url: str = "http://localhost:11434"
     default_model: str = "qwen3:8b"
+    # Ollama models with tool support, offered in the model switcher
+    chat_models: list[str] = [
+        "qwen3:8b",
+        "gpt-oss:latest",
+        "llama3.1:8b",
+    ]
     phoenix_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project: str = "agent-chat"
     tavily_api_key: str = ""
@@ -22,7 +28,9 @@ class Settings(BaseSettings):
     checkpoint_db: str = "checkpoints.db"
 
     mcp_config: str = "mcp_servers.json"
-    mcp_workspace: str = "workspace"  # must match the filesystem root in mcp_servers.json
+    mcp_workspace: str = (
+        "workspace"  # must match the filesystem root in mcp_servers.json
+    )
 
     retrieval_k: int = 20
     rerank_top_n: int = 5

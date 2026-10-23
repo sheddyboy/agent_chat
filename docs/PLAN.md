@@ -85,6 +85,8 @@ class ChatState(TypedDict):
 | POST | `/documents` | Upload. Returns an SSE stream of ingestion progress |
 | GET | `/documents/{doc_id}` | Chunk count for a document |
 | GET | `/threads/{thread_id}` | Thread history from the checkpointer |
+| GET | `/models` | `{models, default}` for the model switcher |
+| GET | `/tools` | `[{name, description, group, sensitive}]`, `group` is `local` or the MCP server |
 
 ## SSE events
 
@@ -165,3 +167,7 @@ Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory
 - Each assistant message keeps its own non-token events; the Activity and Sources panels show the latest turn, or an older one when clicked.
 - A resumed run streams into the same assistant message. Sending is disabled while an approval is pending.
 - The documents page lists only uploads from the current browser session; there is no list endpoint yet.
+- The model switcher offers `chat_models` from config: installed Ollama models with the `tools` capability (qwen3:8b, gpt-oss, llama3.1:8b, qwen2.5-coder:14b).
+- Tool toggles live in graph state (`enabled_tools`), so they are per thread and resumes keep them. Missing means all tools; the agent binds only the enabled ones while `ToolNode` keeps all.
+- MCP tools carry their server name in `tool.metadata["server"]` so the UI can group them.
+- "View trace" links to Phoenix's `/redirects/traces/{trace_id}`, which finds the project itself. The Phoenix UI URL comes from `NEXT_PUBLIC_PHOENIX_URL`.

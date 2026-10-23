@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class ChatState(TypedDict, total=False):
     messages: Annotated[list, add_messages]
     model: str
+    enabled_tools: list[str]
 
 
 def guard_input(state: ChatState) -> Command:
@@ -41,7 +42,12 @@ def agent(state: ChatState) -> dict:
         model=state.get("model", settings.default_model),
         base_url=settings.ollama_url,
         reasoning=False,
-    ).bind_tools(ALL_TOOLS)
+    )
+    # No enabled_tools in state means the chat never chose, so all tools are on
+    enabled = state.get("enabled_tools")
+    tools = ALL_TOOLS if enabled is None else [t for t in ALL_TOOLS if t.name in enabled]
+    if tools:
+        llm = llm.bind_tools(tools)
     return {"messages": [llm.invoke(state.get("messages", []))]}
 
 

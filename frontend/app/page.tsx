@@ -11,6 +11,7 @@ import "streamdown/styles.css";
 import { ActivityPanel } from "@/components/activity-panel";
 import { ApprovalCard } from "@/components/approval-card";
 import { SourcesPanel } from "@/components/sources-panel";
+import { ToolPicker, type Tool } from "@/components/tool-picker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { streamEvents, type ChatEvent } from "@/lib/sse";
@@ -37,7 +38,29 @@ export default function Chat() {
   const [selected, setSelected] = useState<number | null>(null);
   const [tab, setTab] = useState<"activity" | "sources">("activity");
   const [showPanel, setShowPanel] = useState(false);
+  // Model and tools are chosen per chat; New chat resets them to these defaults
+  const [models, setModels] = useState<string[]>([]);
+  const [defaultModel, setDefaultModel] = useState("");
+  const [model, setModel] = useState("");
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [enabledTools, setEnabledTools] = useState<string[]>([]);
   const bottom = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch(`${API}/models`)
+      .then((r) => r.json())
+      .then((d) => {
+        setModels(d.models);
+        setDefaultModel(d.default);
+        setModel(d.default);
+      });
+    fetch(`${API}/tools`)
+      .then((r) => r.json())
+      .then((list: Tool[]) => {
+        setTools(list);
+        setEnabledTools(list.map((t) => t.name));
+      });
+  }, []);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
@@ -82,7 +105,7 @@ export default function Chat() {
       { role: "user", content: message, events: [] },
       { role: "assistant", content: "", events: [] },
     ]);
-    await run(`${API}/chat`, { message, thread_id: threadId });
+    await run(`${API}/chat`, { message, thread_id: threadId, model, enabled_tools: enabledTools });
   }
 
   function decide(action: "approve" | "reject") {
@@ -94,6 +117,8 @@ export default function Chat() {
     setMessages([]);
     setThreadId(null);
     setSelected(null);
+    setModel(defaultModel);
+    setEnabledTools(tools.map((t) => t.name));
   }
 
   // The panel follows the latest turn unless the user clicked an older one
@@ -106,6 +131,16 @@ export default function Chat() {
         <header className="flex items-center justify-between py-3">
           <h1 className="font-semibold">Agent Chat</h1>
           <div className="flex gap-2">
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={streaming}
+              className="rounded-md border bg-background px-2 py-1 text-sm"
+            >
+              {models.map((m) => (
+                <option key={m}>{m}</option>
+              ))}
+            </select>
             <Link href="/documents" className="px-2 py-1 text-sm hover:underline">
               Documents
             </Link>
@@ -147,7 +182,7 @@ export default function Chat() {
         </main>
 
         <form
-          className="flex gap-2 py-4"
+          className="flex items-end gap-2 py-4"
           onSubmit={(e) => {
             e.preventDefault();
             send();
@@ -166,9 +201,12 @@ export default function Chat() {
             rows={2}
             className="resize-none"
           />
-          <Button type="submit" disabled={streaming || !!pending || !input.trim()}>
-            Send
-          </Button>
+          <div className="flex flex-col items-end gap-2">
+            <ToolPicker tools={tools} enabled={enabledTools} onChange={setEnabledTools} />
+            <Button type="submit" disabled={streaming || !!pending || !input.trim()}>
+              Send
+            </Button>
+          </div>
         </form>
       </div>
 

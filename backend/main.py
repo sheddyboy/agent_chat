@@ -18,7 +18,7 @@ from langgraph.types import Command
 from phoenix.otel import register
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
-from tools import ALL_TOOLS
+from tools import ALL_TOOLS, SENSITIVE_TOOLS
 from tools.mcp_loader import load_mcp_tools
 
 tracer_provider = register(
@@ -56,6 +56,7 @@ class ChatRequest(BaseModel):
     message: str
     model: str | None = None
     thread_id: str | None = None
+    enabled_tools: list[str] | None = None
 
 
 class ResumeRequest(BaseModel):
@@ -133,6 +134,9 @@ async def stream_chat(req: ChatRequest):
             "messages": [HumanMessage(req.message)],
             "model": req.model or settings.default_model,
         }
+        # Left out when None so the thread keeps its earlier choice
+        if req.enabled_tools is not None:
+            input["enabled_tools"] = req.enabled_tools
         async for ev in stream_graph(input, thread_id, span):
             yield ev
 
@@ -142,6 +146,24 @@ async def stream_resume(thread_id: str, action: str):
         span.set_input(action)
         async for ev in stream_graph(Command(resume=action), thread_id, span):
             yield ev
+
+
+@app.get("/models")
+def models():
+    return {"models": settings.chat_models, "default": settings.default_model}
+
+
+@app.get("/tools")
+def tools():
+    return [
+        {
+            "name": t.name,
+            "description": t.description,
+            "group": (t.metadata or {}).get("server", "local"),
+            "sensitive": t.name in SENSITIVE_TOOLS,
+        }
+        for t in ALL_TOOLS
+    ]
 
 
 @app.post("/chat")

@@ -17,7 +17,12 @@ async def load_mcp_tools() -> list:
     tools = []
     for name in servers:
         try:
-            tools += await client.get_tools(server_name=name)
+            server_tools = await client.get_tools(server_name=name)
         except Exception as e:
             log.warning("MCP server %s failed to load: %s", name, e)
+            continue
+        # Lets the UI group tools by the server they came from
+        for t in server_tools:
+            t.metadata = {**(t.metadata or {}), "server": name}
+        tools += server_tools
     return tools

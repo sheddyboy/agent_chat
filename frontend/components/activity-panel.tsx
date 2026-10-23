@@ -1,5 +1,7 @@
 import type { ChatEvent } from "@/lib/sse";
 
+const PHOENIX = process.env.NEXT_PUBLIC_PHOENIX_URL ?? "http://localhost:6006";
+
 // One row per node, tool call, guard check or approval request, in stream order
 export function ActivityPanel({ events }: { events: ChatEvent[] }) {
   const ends = new Map(
@@ -65,7 +67,17 @@ export function ActivityPanel({ events }: { events: ChatEvent[] }) {
         }
       })}
       {done && (
-        <li className="pt-2 text-xs text-muted-foreground">trace {done.trace_id as string}</li>
+        <li className="pt-2 text-xs">
+          {/* Phoenix resolves the trace's project and opens it */}
+          <a
+            href={`${PHOENIX}/redirects/traces/${done.trace_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-muted-foreground underline hover:text-foreground"
+          >
+            View trace in Phoenix
+          </a>
+        </li>
       )}
     </ol>
   );
