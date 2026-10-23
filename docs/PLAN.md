@@ -140,7 +140,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: each suite runs with one `uv run python -m evals.<suite>` and shows up as experiments in Phoenix.
 - [ ] **12. Chat persistence.** Chats survive a reload, like Claude: a URL per chat, paged recents, delete.
   - [x] **12a. Backend threads.** `db.py` with a `threads` table in `app.db`, `GET /threads` (keyset paging), `GET /threads/{id}` (history rebuilt by `history.py`), `DELETE /threads/{id}`.
-  - [ ] **12b. Frontend chats.** `/c/[id]` route, sidebar loads paged recents from the backend, open and delete.
+  - [x] **12b. Frontend chats.** `/c/[id]` route, sidebar loads paged recents from the backend (infinite scroll), open and delete with inline confirm.
   - [ ] **12c. Auto titles.** Short LLM title after the first turn, `title` SSE event.
   Done when: a refresh reopens any chat with its messages, sources and activity.
 - [ ] **13. Attachments.** Attach PDFs to a chat like Claude's `+` button; questions only search the attached files.
@@ -168,6 +168,7 @@ Deep research subgraph, long-term memory, conversation branching, artifacts pane
 - One SQLite file (`app.db`) holds LangGraph's checkpoints and our own tables; our code uses stdlib `sqlite3` with a short-lived connection per call.
 - The checkpointer is the source of truth for messages. The `threads` table is only an index for the sidebar; `GET /threads/{id}` rebuilds the UI messages and events from the checkpoint (no `ms` or `trace_id`, those are not stored).
 - Recent chats use keyset paging on `(updated_at, thread_id)` so pages stay stable while new chats arrive.
+- The URL decides which chat is open (`/` new, `/c/{id}` saved). `Chat` reads `usePathname()` instead of route params, so a new chat can take its URL with `history.replaceState` after the first `done` without remounting. Next 16 keeps visited routes mounted but hidden (`Activity`), so state must follow the URL, not mount.
 - Single event vocabulary with a `type` field for all streams.
 - Tavily for web search; the one online dependency, needs `TAVILY_API_KEY`.
 - `save_note` is the first sensitive tool; more join `SENSITIVE_TOOLS` with one line each.

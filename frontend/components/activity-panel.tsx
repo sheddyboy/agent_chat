@@ -39,7 +39,8 @@ export function ActivityPanel({ events }: { events: ChatEvent[] }) {
                     <div className="flex justify-between gap-2">
                       <span className="truncate font-mono text-xs font-medium">{e.name as string}</span>
                       <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                        {end ? `${end.ms} ms` : "running"}
+                        {/* Reopened chats have no durations */}
+                        {end ? (end.ms != null ? `${end.ms} ms` : "") : "running"}
                       </span>
                     </div>
                     <pre className="mt-1 overflow-x-auto font-mono text-xs text-muted-foreground">
@@ -88,15 +89,18 @@ export function ActivityPanel({ events }: { events: ChatEvent[] }) {
       </ol>
       {done && (
         // Phoenix resolves the project from the trace or session id and opens it
-        <div className="grid grid-cols-2 gap-2">
-          <a
-            href={`${PHOENIX}/redirects/traces/${done.trace_id}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex h-8 items-center justify-center gap-2 rounded-lg border text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            View trace <ExternalLink className="size-3.5" />
-          </a>
+        <div className="grid auto-cols-fr grid-flow-col gap-2">
+          {/* Reopened chats have no trace id, only the session */}
+          {done.trace_id != null && (
+            <a
+              href={`${PHOENIX}/redirects/traces/${done.trace_id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-8 items-center justify-center gap-2 rounded-lg border text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              View trace <ExternalLink className="size-3.5" />
+            </a>
+          )}
           <a
             href={`${PHOENIX}/redirects/sessions/${done.thread_id}`}
             target="_blank"

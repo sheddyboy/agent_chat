@@ -29,7 +29,7 @@ function toSteps(events: ChatEvent[], live: boolean): Step[] {
         label: (
           <>
             {verb} <code className="font-mono text-xs">{e.name as string}</code>
-            {end && !rejected && <span className="ml-1.5 font-mono text-xs opacity-60">{end.ms as number} ms</span>}
+            {end?.ms != null && !rejected && <span className="ml-1.5 font-mono text-xs opacity-60">{end.ms as number} ms</span>}
           </>
         ),
         done: !!end,

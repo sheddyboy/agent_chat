@@ -1,37 +1,81 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { FileText, MessageSquare, PanelLeft, Plus, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { FileText, MessageSquare, PanelLeft, Plus, Sparkles, Trash2 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export type ChatSummary = { id: string; title: string };
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const PAGE = 30;
+
+type Thread = { thread_id: string; title: string; updated_at: string };
 
 const item =
   "flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50";
+// Links have no :disabled, so they get the same look by hand
+const off = "pointer-events-none opacity-50";
 
-// Left nav with this session's chats. Desktop can collapse it to an icon rail;
-// on small screens it is an overlay opened from the page header.
-// Without onNew (the documents page) New chat is a link back to the chat page.
+// Left nav with recent chats from the backend, newest first, loaded a page at a time
+// as the list scrolls. Desktop can collapse it to an icon rail; on small screens it
+// is an overlay opened from the page header. `version` changes after each chat turn.
 export function Sidebar({
-  chats = [],
   currentId,
-  onNew,
-  onOpen,
+  version = 0,
   disabled,
   open,
   onClose,
 }: {
-  chats?: ChatSummary[];
   currentId?: string;
-  onNew?: () => void;
-  onOpen?: (id: string) => void;
+  version?: number;
   disabled?: boolean;
   open: boolean;
   onClose: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [next, setNext] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const loadingMore = useRef(false);
+  const router = useRouter();
   const label = collapsed ? "md:hidden" : "";
+
+  // A turn moves its chat to the top, so start again from the first page
+  useEffect(() => {
+    fetch(`${API}/threads?limit=${PAGE}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setThreads(d.threads);
+        setNext(d.next);
+      });
+  }, [version]);
+
+  // Load the next page when the bottom of the list scrolls into view
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !next) return;
+    const observer = new IntersectionObserver(async ([entry]) => {
+      if (!entry.isIntersecting || loadingMore.current) return;
+      loadingMore.current = true;
+      const d = await fetch(`${API}/threads?limit=${PAGE}&before=${encodeURIComponent(next)}`).then((r) => r.json());
+      setThreads((prev) => {
+        const seen = new Set(prev.map((t) => t.thread_id));
+        return [...prev, ...d.threads.filter((t: Thread) => !seen.has(t.thread_id))];
+      });
+      setNext(d.next);
+      loadingMore.current = false;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [next]);
+
+  async function remove(id: string) {
+    await fetch(`${API}/threads/${id}`, { method: "DELETE" });
+    setThreads((prev) => prev.filter((t) => t.thread_id !== id));
+    setConfirming(null);
+    if (id === currentId) router.push("/");
+  }
 
   return (
     <>
@@ -56,46 +100,57 @@ export function Sidebar({
           </button>
         </div>
 
-        {onNew ? (
-          <button
-            className={item}
-            disabled={disabled}
-            onClick={() => {
-              onNew();
-              onClose();
-            }}
-          >
-            <Plus className="size-4 shrink-0" />
-            <span className={label}>New chat</span>
-          </button>
-        ) : (
-          <Link href="/" className={item}>
-            <Plus className="size-4 shrink-0" />
-            <span className={label}>New chat</span>
-          </Link>
-        )}
+        <Link href="/" onClick={onClose} className={`${item} ${disabled ? off : ""}`}>
+          <Plus className="size-4 shrink-0" />
+          <span className={label}>New chat</span>
+        </Link>
         <Link href="/documents" className={item}>
           <FileText className="size-4 shrink-0" />
           <span className={label}>Documents</span>
         </Link>
 
-        {chats.length > 0 && (
+        {threads.length > 0 && (
           <div className={`mt-4 min-h-0 flex-1 overflow-y-auto ${label}`}>
-            <p className="px-2 pb-1 text-xs text-muted-foreground/70">This session</p>
-            {chats.map((c) => (
-              <button
-                key={c.id}
-                disabled={disabled}
-                onClick={() => {
-                  onOpen?.(c.id);
-                  onClose();
-                }}
-                className={`${item} ${c.id === currentId ? "bg-sidebar-accent text-foreground" : ""}`}
-              >
-                <MessageSquare className="size-3.5 shrink-0" />
-                <span className="truncate">{c.title}</span>
-              </button>
-            ))}
+            <p className="px-2 pb-1 text-xs text-muted-foreground/70">Recents</p>
+            {threads.map((t) =>
+              confirming === t.thread_id ? (
+                <div key={t.thread_id} className={`${item} justify-between bg-sidebar-accent text-foreground`}>
+                  <span className="truncate">Delete chat?</span>
+                  <span className="flex shrink-0 gap-1">
+                    <button
+                      onClick={() => remove(t.thread_id)}
+                      className="rounded px-1.5 py-0.5 text-xs text-destructive hover:bg-destructive/10"
+                    >
+                      Delete
+                    </button>
+                    <button onClick={() => setConfirming(null)} className="rounded px-1.5 py-0.5 text-xs hover:bg-muted">
+                      Cancel
+                    </button>
+                  </span>
+                </div>
+              ) : (
+                <div key={t.thread_id} className="group relative">
+                  <Link
+                    href={`/c/${t.thread_id}`}
+                    onClick={onClose}
+                    className={`${item} pr-8 ${t.thread_id === currentId ? "bg-sidebar-accent text-foreground" : ""} ${disabled ? off : ""}`}
+                  >
+                    <MessageSquare className="size-3.5 shrink-0" />
+                    <span className="truncate">{t.title}</span>
+                  </Link>
+                  <button
+                    onClick={() => setConfirming(t.thread_id)}
+                    disabled={disabled}
+                    title="Delete chat"
+                    aria-label="Delete chat"
+                    className="absolute top-1 right-1 hidden size-6 items-center justify-center rounded text-muted-foreground group-hover:flex hover:text-foreground focus-visible:flex disabled:hidden"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              ),
+            )}
+            <div ref={sentinel} className="h-px" />
           </div>
         )}
 
