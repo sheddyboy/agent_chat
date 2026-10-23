@@ -19,6 +19,7 @@ class ChatState(TypedDict, total=False):
     messages: Annotated[list, add_messages]
     model: str
     enabled_tools: list[str]
+    think: bool
 
 
 def guard_input(state: ChatState) -> Command:
@@ -37,12 +38,12 @@ def guard_input(state: ChatState) -> Command:
 
 
 def agent(state: ChatState) -> dict:
-    model = state.get("model", settings.default_model)
-    # reasoning=True moves thinking out of the answer into reasoning_content
+    # reasoning=True moves thinking out of the answer into reasoning_content;
+    # the frontend only sends think for models with Ollama's thinking capability
     llm = ChatOllama(
-        model=model,
+        model=state.get("model", settings.default_model),
         base_url=settings.ollama_url,
-        reasoning=model in settings.reasoning_models,
+        reasoning=state.get("think", False),
     )
     # No enabled_tools in state means the chat never chose, so all tools are on
     enabled = state.get("enabled_tools")

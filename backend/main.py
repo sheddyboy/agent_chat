@@ -15,6 +15,7 @@ from ingestion.store import count
 from langchain_core.messages import AIMessageChunk, HumanMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
+from ollama import Client
 from phoenix.otel import register
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -57,6 +58,7 @@ class ChatRequest(BaseModel):
     model: str | None = None
     thread_id: str | None = None
     enabled_tools: list[str] | None = None
+    think: bool = False
 
 
 class ResumeRequest(BaseModel):
@@ -137,6 +139,7 @@ async def stream_chat(req: ChatRequest):
         input = {
             "messages": [HumanMessage(req.message)],
             "model": req.model or settings.default_model,
+            "think": req.think,
         }
         # Left out when None so the thread keeps its earlier choice
         if req.enabled_tools is not None:
@@ -152,9 +155,20 @@ async def stream_resume(thread_id: str, action: str):
             yield ev
 
 
+def can_think(client: Client, model: str) -> bool:
+    try:
+        return "thinking" in (client.show(model).capabilities or [])
+    except Exception:  # not pulled, or Ollama is down: offer the model without thinking
+        return False
+
+
 @app.get("/models")
 def models():
-    return {"models": settings.chat_models, "default": settings.default_model}
+    client = Client(host=settings.ollama_url)
+    return {
+        "models": [{"name": m, "thinking": can_think(client, m)} for m in settings.chat_models],
+        "default": settings.default_model,
+    }
 
 
 @app.get("/tools")

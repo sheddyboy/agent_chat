@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Loader2, Menu, PanelRight, Sparkles, X } from "lucide-react";
+import { ArrowUp, Brain, Loader2, Menu, PanelRight, Sparkles, X } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { createMathPlugin } from "@streamdown/math";
@@ -38,7 +38,16 @@ type Message = {
   thoughtMs?: number;
 };
 // A chat parked in the sidebar; only lives for this browser session
-type SavedChat = { id: string; messages: Message[]; threadId: string | null; model: string; enabledTools: string[] };
+type SavedChat = {
+  id: string;
+  messages: Message[];
+  threadId: string | null;
+  model: string;
+  enabledTools: string[];
+  think: boolean;
+};
+// thinking: Ollama reports the model can reason before answering
+type Model = { name: string; thinking: boolean };
 
 // The pending interrupt of a turn: nothing but "done" has arrived after it
 function pendingInterrupt(events: ChatEvent[]) {
@@ -62,12 +71,13 @@ export default function Chat() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [chatId, setChatId] = useState("first");
   const [saved, setSaved] = useState<SavedChat[]>([]);
-  // Model and tools are chosen per chat; New chat resets them to these defaults
-  const [models, setModels] = useState<string[]>([]);
+  // Model, tools and thinking are chosen per chat; New chat resets them to these defaults
+  const [models, setModels] = useState<Model[]>([]);
   const [defaultModel, setDefaultModel] = useState("");
   const [model, setModel] = useState("");
   const [tools, setTools] = useState<Tool[]>([]);
   const [enabledTools, setEnabledTools] = useState<string[]>([]);
+  const [think, setThink] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -133,6 +143,7 @@ export default function Chat() {
   }
 
   const last = messages[messages.length - 1];
+  const canThink = models.find((m) => m.name === model)?.thinking ?? false;
   const pending = last ? pendingInterrupt(last.events) : null;
 
   async function send() {
@@ -145,7 +156,14 @@ export default function Chat() {
       { role: "user", content: message, events: [] },
       { role: "assistant", content: "", events: [], startedAt: Date.now() },
     ]);
-    await run(`${API}/chat`, { message, thread_id: threadId, model, enabled_tools: enabledTools });
+    await run(`${API}/chat`, {
+      message,
+      thread_id: threadId,
+      model,
+      enabled_tools: enabledTools,
+      // A chat switched to a model that can't think must not ask it to
+      think: think && canThink,
+    });
   }
 
   function decide(action: "approve" | "reject") {
@@ -157,7 +175,7 @@ export default function Chat() {
   // Park the open chat in the sidebar list, keeping its place if already there
   function saveCurrent() {
     if (!messages.length) return;
-    const chat = { id: chatId, messages, threadId, model, enabledTools };
+    const chat = { id: chatId, messages, threadId, model, enabledTools, think };
     setSaved((prev) =>
       prev.some((c) => c.id === chatId) ? prev.map((c) => (c.id === chatId ? chat : c)) : [chat, ...prev],
     );
@@ -169,12 +187,20 @@ export default function Chat() {
     setThreadId(chat.threadId);
     setModel(chat.model);
     setEnabledTools(chat.enabledTools);
+    setThink(chat.think);
     setSelected(null);
   }
 
   function newChat() {
     saveCurrent();
-    load({ id: crypto.randomUUID(), messages: [], threadId: null, model: defaultModel, enabledTools: tools.map((t) => t.name) });
+    load({
+      id: crypto.randomUUID(),
+      messages: [],
+      threadId: null,
+      model: defaultModel,
+      enabledTools: tools.map((t) => t.name),
+      think: false,
+    });
   }
 
   function openChat(id: string) {
@@ -223,12 +249,27 @@ export default function Chat() {
           className="h-7 max-w-44 cursor-pointer truncate rounded-md bg-transparent px-2 text-xs text-muted-foreground outline-none hover:bg-muted hover:text-foreground"
         >
           {models.map((m) => (
-            <option key={m} className="bg-popover text-popover-foreground">
-              {m}
+            <option key={m.name} value={m.name} className="bg-popover text-popover-foreground">
+              {m.thinking ? `${m.name} · thinks` : m.name}
             </option>
           ))}
         </select>
         <ToolPicker tools={tools} enabled={enabledTools} onChange={setEnabledTools} />
+        <button
+          type="button"
+          onClick={() => setThink(!think)}
+          disabled={!canThink || streaming}
+          aria-pressed={think && canThink}
+          title={canThink ? "Let the model reason before answering" : `${model} can't think`}
+          className={`flex h-7 items-center gap-1.5 rounded-md px-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            think && canThink
+              ? "bg-foreground/10 text-foreground"
+              : "text-muted-foreground enabled:hover:bg-muted enabled:hover:text-foreground"
+          }`}
+        >
+          <Brain className="size-3.5" />
+          Think
+        </button>
         <Button
           type="submit"
           size="icon-sm"
