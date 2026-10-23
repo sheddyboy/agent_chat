@@ -1,14 +1,25 @@
+from typing import Annotated
+
 from config import settings
 from langchain_core.tools import tool
 from langgraph.config import get_stream_writer
+from langgraph.prebuilt import InjectedState
 from retrieval.hybrid import hybrid_search
 from retrieval.rerank import rerank
 
 
 @tool(response_format="content_and_artifact")
-def search_documents(query: str) -> tuple[str, list[dict]]:
+def search_documents(
+    query: str, state: Annotated[dict, InjectedState]
+) -> tuple[str, list[dict]]:
     """Search the user's uploaded documents. Use this for any question about their files or PDFs."""
-    candidates = [doc for doc, _score in hybrid_search(query, settings.retrieval_k)]
+    # The chat's attachments come from graph state; the model never sees this argument
+    doc_ids = None
+    if settings.search_scope == "attachments":
+        doc_ids = [a["doc_id"] for a in state.get("attachments", [])]
+        if not doc_ids:
+            return "No documents are attached to this chat.", []
+    candidates = [doc for doc, _score in hybrid_search(query, settings.retrieval_k, doc_ids)]
     if not candidates:
         return "No documents found.", []
 

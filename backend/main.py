@@ -1,4 +1,3 @@
-import shutil
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -6,14 +5,22 @@ from pathlib import Path
 from typing import Literal
 
 from config import settings
-from db import delete_thread, get_thread, init_db, list_threads, set_title, touch_thread
+from db import (
+    delete_thread,
+    get_document,
+    get_thread,
+    init_db,
+    list_documents,
+    list_threads,
+    set_title,
+    touch_thread,
+)
 from events import event
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from history import to_ui_messages
-from ingestion.pipeline import ingest
-from ingestion.store import count
+from ingestion.pipeline import ingest, make_doc_id
 from langchain_core.messages import AIMessageChunk, HumanMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
@@ -64,6 +71,7 @@ class ChatRequest(BaseModel):
     thread_id: str | None = None
     enabled_tools: list[str] | None = None
     think: bool = False
+    attachments: list[str] | None = None  # doc_ids from the library, added to the thread
 
 
 class ResumeRequest(BaseModel):
@@ -146,14 +154,27 @@ async def stream_graph(input, thread_id: str, span, first_message: str | None = 
     yield event("done", trace_id=trace_id, thread_id=thread_id)
 
 
-async def stream_chat(req: ChatRequest):
+def ready_attachments(doc_ids: list[str]) -> list[dict]:
+    """Look up attached docs; names come from the library, never from the client."""
+    attachments = []
+    for doc_id in doc_ids:
+        doc = get_document(doc_id)
+        if not doc or doc["status"] != "ready":
+            raise HTTPException(400, f"document {doc_id} is not ready")
+        attachments.append({"doc_id": doc_id, "name": doc["name"]})
+    return attachments
+
+
+async def stream_chat(req: ChatRequest, attachments: list[dict]):
     thread_id = req.thread_id or str(uuid.uuid4())
     is_new = get_thread(thread_id) is None
     touch_thread(thread_id, req.message[:60])  # placeholder title until make_title's
     with tracer.start_as_current_span("chat", openinference_span_kind="chain") as span:
         span.set_input(req.message)
         input = {
-            "messages": [HumanMessage(req.message)],
+            # The turn's attachments ride on the message so history can show them per turn
+            "messages": [HumanMessage(req.message, additional_kwargs={"attachments": attachments})],
+            "attachments": attachments,
             "model": req.model or settings.default_model,
             "think": req.think,
         }
@@ -203,7 +224,9 @@ def tools():
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
-    return EventSourceResponse(stream_chat(req))
+    # Checked before streaming starts, so a bad id is a plain 400
+    attachments = ready_attachments(req.attachments or [])
+    return EventSourceResponse(stream_chat(req, attachments))
 
 
 @app.post("/chat/{thread_id}/resume")
@@ -261,14 +284,23 @@ async def stream_ingest(path: Path, doc_name: str):
 async def upload_document(file: UploadFile):
     if not file.filename:
         raise HTTPException(400, "file has no filename")
-    upload_dir = Path(settings.upload_dir)
-    upload_dir.mkdir(exist_ok=True)
-    path = upload_dir / Path(file.filename).name
-    with path.open("wb") as out:
-        shutil.copyfileobj(file.file, out)
-    return EventSourceResponse(stream_ingest(path, path.name))
+    data = await file.read()
+    name = Path(file.filename).name
+    # One folder per content hash, so two files with the same name never collide
+    path = Path(settings.upload_dir) / make_doc_id(data) / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return EventSourceResponse(stream_ingest(path, name))
+
+
+@app.get("/documents")
+def documents():
+    return list_documents()
 
 
 @app.get("/documents/{doc_id}")
 def document_info(doc_id: str):
-    return {"doc_id": doc_id, "chunks": count(doc_id)}
+    doc = get_document(doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    return doc

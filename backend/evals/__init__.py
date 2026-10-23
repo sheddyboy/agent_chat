@@ -4,3 +4,5 @@ from config import settings
 # and the local-mode lock never clashes with a running uvicorn
 settings.qdrant_path = "eval_qdrant_data"
 settings.qdrant_collection = "hotpot"
+# Eval questions come without attachments, so search the whole collection
+settings.search_scope = "all"

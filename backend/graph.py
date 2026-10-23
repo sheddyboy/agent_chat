@@ -3,7 +3,7 @@ from typing import Annotated, TypedDict
 
 from config import settings
 from guard import injection_score
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
@@ -15,11 +15,26 @@ from tools import ALL_TOOLS, SENSITIVE_TOOLS
 logger = logging.getLogger(__name__)
 
 
+def merge_attachments(old: list[dict], new: list[dict]) -> list[dict]:
+    """Attachments only accumulate on a thread; the same doc twice is kept once."""
+    seen = {a["doc_id"] for a in old}
+    return old + [a for a in new if a["doc_id"] not in seen]
+
+
 class ChatState(TypedDict, total=False):
     messages: Annotated[list, add_messages]
     model: str
     enabled_tools: list[str]
     think: bool
+    attachments: Annotated[list[dict], merge_attachments]  # [{doc_id, name}]
+
+
+def attachment_note(attachments: list[dict]) -> SystemMessage:
+    names = ", ".join(a["name"] for a in attachments)
+    return SystemMessage(
+        f"The user attached these files to this chat: {names}. "
+        "Use search_documents to answer questions about them, and cite sources inline as [n]."
+    )
 
 
 def guard_input(state: ChatState) -> Command:
@@ -48,9 +63,16 @@ def agent(state: ChatState) -> dict:
     # No enabled_tools in state means the chat never chose, so all tools are on
     enabled = state.get("enabled_tools")
     tools = ALL_TOOLS if enabled is None else [t for t in ALL_TOOLS if t.name in enabled]
+    messages = state.get("messages", [])
+    attachments = state.get("attachments", [])
+    if attachments:
+        messages = [attachment_note(attachments), *messages]
+    elif settings.search_scope == "attachments":
+        # Nothing to search in this chat, so don't offer the tool at all
+        tools = [t for t in tools if t.name != "search_documents"]
     if tools:
         llm = llm.bind_tools(tools)
-    return {"messages": [llm.invoke(state.get("messages", []))]}
+    return {"messages": [llm.invoke(messages)]}
 
 
 def approval(state: ChatState) -> Command:

@@ -11,7 +11,8 @@ def to_ui_messages(messages: list, interrupts, thread_id: str) -> list[dict]:
     args = {}  # tool_call id -> args, so a search hit list can show its query
     for msg in messages:
         if isinstance(msg, HumanMessage):
-            ui.append({"role": "user", "content": msg.text, "events": []})
+            attachments = msg.additional_kwargs.get("attachments", [])
+            ui.append({"role": "user", "content": msg.text, "events": [], "attachments": attachments})
             ui.append({"role": "assistant", "content": "", "events": []})
             continue
         if not ui:

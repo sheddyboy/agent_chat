@@ -74,16 +74,19 @@ class ChatState(TypedDict):
     messages: Annotated[list, add_messages]
     model: str
     enabled_tools: list[str]
+    think: bool
+    attachments: Annotated[list[dict], merge_attachments]  # [{doc_id, name}], only grows
 ```
 
 ## API
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/chat` | `thread_id`, `message`, `model`, `enabled_tools`. Returns an SSE stream |
+| POST | `/chat` | `thread_id`, `message`, `model`, `enabled_tools`, `attachments` (doc ids, must be ready, else 400). Returns an SSE stream |
 | POST | `/chat/{thread_id}/resume` | `{"action": "approve" \| "reject"}`. Returns an SSE stream |
 | POST | `/documents` | Upload. Returns an SSE stream of ingestion progress |
-| GET | `/documents/{doc_id}` | Chunk count for a document |
+| GET | `/documents` | The library: `[{doc_id, name, path, size_bytes, pages, chunks, status, error, created_at}]`, newest first |
+| GET | `/documents/{doc_id}` | One library row (`status` is ingesting, ready or failed) |
 | GET | `/threads` | `?limit=30&before=<cursor>`. Recent chats, newest first, `{threads, next}` |
 | GET | `/threads/{thread_id}` | Title, model, tools, think and `messages` rebuilt from the checkpointer in the frontend's shape |
 | DELETE | `/threads/{thread_id}` | Removes the thread row and its checkpoints |
@@ -145,7 +148,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **12c. Auto titles.** `titles.py` asks the default model for a 3 to 6 word title from the first user message, saved and sent as a `title` event.
   Done when: a refresh reopens any chat with its messages, sources and activity.
 - [ ] **13. Attachments.** Attach PDFs to a chat like Claude's `+` button; questions only search the attached files.
-  - [ ] **13a. Backend scoping.** `documents` table, `uploads/{doc_id}/name`, `GET /documents`, `attachments` in state, filtered search.
+  - [x] **13a. Backend scoping.** `documents` table with ingestion status, `uploads/{doc_id}/name`, `GET /documents`, `attachments` (doc ids) on `/chat` merged into thread state, search filtered to them, a system note naming the files.
   - [ ] **13b. Composer upload.** `+` button, upload chips with progress, send gating.
   - [ ] **13c. Library picker.** "From library" in the `+` menu, persistent Documents page, "Ask about this".
   Done when: two chats with different attachments get answers only from their own files.
@@ -169,6 +172,9 @@ Deep research subgraph, long-term memory, conversation branching, artifacts pane
 - One SQLite file (`app.db`) holds LangGraph's checkpoints and our own tables; our code uses stdlib `sqlite3` with a short-lived connection per call.
 - The checkpointer is the source of truth for messages. The `threads` table is only an index for the sidebar; `GET /threads/{id}` rebuilds the UI messages and events from the checkpoint (no `ms` or `trace_id`, those are not stored).
 - Titles come from the first user message only (like Claude), so they also work when the first turn stops at an approval. The frontend treats `title` like `done` when checking for a pending interrupt.
+- Questions only search the chat's attached documents (`search_scope = "attachments"`). A chat with none is not offered `search_documents` at all. Evals set `search_scope = "all"` to search the whole HotpotQA collection.
+- Attachment names come from the `documents` table, never from the client. Each user message keeps its turn's attachments in `additional_kwargs` so history can show them.
+- Uploads live in `uploads/{doc_id}/{name}`; the `documents` row tracks ingestion status so the library can show failed or in-progress files.
 - Recent chats use keyset paging on `(updated_at, thread_id)` so pages stay stable while new chats arrive.
 - The URL decides which chat is open (`/` new, `/c/{id}` saved). `Chat` reads `usePathname()` instead of route params, so a new chat can take its URL with `history.replaceState` after the first `done` without remounting. Next 16 keeps visited routes mounted but hidden (`Activity`), so state must follow the URL, not mount.
 - Single event vocabulary with a `type` field for all streams.

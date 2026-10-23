@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +34,9 @@ class Settings(BaseSettings):
         "workspace"  # must match the filesystem root in mcp_servers.json
     )
 
+    # "attachments": a chat searches only its attached files (and has no search tool
+    # without any). Evals use "all" to search the whole collection.
+    search_scope: Literal["attachments", "all"] = "attachments"
     retrieval_k: int = 20
     rerank_top_n: int = 5
     rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
