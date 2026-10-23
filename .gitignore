@@ -10,6 +10,7 @@ node_modules/
 # Local data and secrets
 .env
 qdrant_data/
+eval_qdrant_data/
 uploads/
 notes/
 *.db

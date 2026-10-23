@@ -130,10 +130,16 @@ Backend slices are tested with `curl -N` before any frontend work.
 - [x] **9. Frontend: panels.** Activity panel, Sources panel, approval card, documents page with upload progress.
   Done when: every event type has a visible place in the UI.
 - [ ] **10. Polish.** Model switcher, per-chat tool toggles, "View trace" button, docker compose, README, demo video.
+- [ ] **11. Evals.** One suite per component in `backend/evals/`, public datasets, our own evaluators, run as Phoenix experiments.
+  - [x] **11a. Retrieval.** HotpotQA subset in a separate Qdrant folder, hit@5, recall@5, MRR, rerank on vs off.
+  - [ ] **11b. Answers.** Full graph with `search_documents`, contains-answer plus a faithfulness judge.
+  - [ ] **11c. Guard.** `injection_score` on `deepset/prompt-injections`, precision and recall.
+  - [ ] **11d. Tools.** About 30 written prompts, expected tool vs first tool call.
+  Done when: each suite runs with one `uv run python -m evals.<suite>` and shows up as experiments in Phoenix.
 
 ## Later ideas
 
-Deep research subgraph, eval dashboard (RAGAS / Phoenix evals), long-term memory, conversation branching, artifacts pane, voice input/output, image generation, `guard_output` node.
+Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, image generation, `guard_output` node.
 
 ## Decisions log
 
