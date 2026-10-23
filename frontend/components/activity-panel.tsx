@@ -87,15 +87,25 @@ export function ActivityPanel({ events }: { events: ChatEvent[] }) {
         })}
       </ol>
       {done && (
-        // Phoenix resolves the trace's project and opens it
-        <a
-          href={`${PHOENIX}/redirects/traces/${done.trace_id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex h-8 items-center justify-center gap-2 rounded-lg border text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          View trace in Phoenix <ExternalLink className="size-3.5" />
-        </a>
+        // Phoenix resolves the project from the trace or session id and opens it
+        <div className="grid grid-cols-2 gap-2">
+          <a
+            href={`${PHOENIX}/redirects/traces/${done.trace_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-8 items-center justify-center gap-2 rounded-lg border text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            View trace <ExternalLink className="size-3.5" />
+          </a>
+          <a
+            href={`${PHOENIX}/redirects/sessions/${done.thread_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-8 items-center justify-center gap-2 rounded-lg border text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            View session <ExternalLink className="size-3.5" />
+          </a>
+        </div>
       )}
     </div>
   );
