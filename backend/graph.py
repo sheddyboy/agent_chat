@@ -31,9 +31,13 @@ class ChatState(TypedDict, total=False):
 
 def attachment_note(attachments: list[dict]) -> SystemMessage:
     names = ", ".join(a["name"] for a in attachments)
+    # Small models skip the tool on vague asks ("what is this about?") unless told plainly
     return SystemMessage(
         f"The user attached these files to this chat: {names}. "
-        "Use search_documents to answer questions about them, and cite sources inline as [n]."
+        "You cannot see their contents directly: the only way to read them is the search_documents tool. "
+        "For any question about the files, call search_documents first, even for broad requests like "
+        '"what is this about" or "summarize this" (search for the main topics, e.g. the file name or "overview"). '
+        "Never say you lack access to the files. Cite sources inline as [n]."
     )
 
 
