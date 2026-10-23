@@ -87,7 +87,11 @@ async def stream_graph(input, thread_id: str, span):
                 yield event(**chunk)  # pyright: ignore[reportCallIssue]
             elif mode == "messages":
                 msg, _meta = chunk
-                if isinstance(msg, AIMessageChunk) and msg.text:
+                if not isinstance(msg, AIMessageChunk):
+                    continue
+                if reasoning := msg.additional_kwargs.get("reasoning_content"):
+                    yield event("reasoning", text=reasoning)
+                if msg.text:
                     answer += msg.text
                     yield event("token", text=msg.text)
             elif not isinstance(chunk, dict):

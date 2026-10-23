@@ -37,11 +37,12 @@ def guard_input(state: ChatState) -> Command:
 
 
 def agent(state: ChatState) -> dict:
-    # reasoning=False keeps qwen3's thinking text out of the token stream
+    model = state.get("model", settings.default_model)
+    # reasoning=True moves thinking out of the answer into reasoning_content
     llm = ChatOllama(
-        model=state.get("model", settings.default_model),
+        model=model,
         base_url=settings.ollama_url,
-        reasoning=False,
+        reasoning=model in settings.reasoning_models,
     )
     # No enabled_tools in state means the chat never chose, so all tools are on
     enabled = state.get("enabled_tools")

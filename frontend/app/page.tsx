@@ -12,6 +12,7 @@ import { ActivityPanel } from "@/components/activity-panel";
 import { ApprovalCard } from "@/components/approval-card";
 import { Sidebar } from "@/components/sidebar";
 import { SourcesPanel } from "@/components/sources-panel";
+import { Steps } from "@/components/steps";
 import { ToolPicker, type Tool } from "@/components/tool-picker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,8 +28,15 @@ const SUGGESTIONS = [
   "Explain RAG with a mermaid diagram",
 ];
 
-// events holds every non-token event of an assistant turn, for the side panel
-type Message = { role: "user" | "assistant"; content: string; events: ChatEvent[] };
+// events holds every non-token event of an assistant turn, for the side panel.
+// thoughtMs is the time from startedAt to the first answer token
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+  events: ChatEvent[];
+  startedAt?: number;
+  thoughtMs?: number;
+};
 // A chat parked in the sidebar; only lives for this browser session
 type SavedChat = { id: string; messages: Message[]; threadId: string | null; model: string; enabledTools: string[] };
 
@@ -94,8 +102,22 @@ export default function Chat() {
   }
 
   function onEvent(ev: ChatEvent) {
-    if (ev.type === "token") return appendToLast(ev.text as string);
-    updateLast((m) => ({ ...m, events: [...m.events, ev] }));
+    if (ev.type === "token") {
+      const now = Date.now();
+      return updateLast((m) => ({
+        ...m,
+        content: m.content + ev.text,
+        thoughtMs: m.thoughtMs ?? (m.startedAt ? now - m.startedAt : undefined),
+      }));
+    }
+    updateLast((m) => {
+      // Reasoning streams in small chunks; keep one event per stretch of thinking
+      const prev = m.events[m.events.length - 1];
+      if (ev.type === "reasoning" && prev?.type === "reasoning") {
+        return { ...m, events: [...m.events.slice(0, -1), { ...prev, text: `${prev.text}${ev.text}` }] };
+      }
+      return { ...m, events: [...m.events, ev] };
+    });
     if (ev.type === "done") setThreadId(ev.thread_id as string);
     if (ev.type === "error") appendToLast(`\n\n**Error:** ${ev.message}`);
   }
@@ -121,13 +143,14 @@ export default function Chat() {
     setMessages((prev) => [
       ...prev,
       { role: "user", content: message, events: [] },
-      { role: "assistant", content: "", events: [] },
+      { role: "assistant", content: "", events: [], startedAt: Date.now() },
     ]);
     await run(`${API}/chat`, { message, thread_id: threadId, model, enabled_tools: enabledTools });
   }
 
   function decide(action: "approve" | "reject") {
-    // The resumed run keeps streaming into the same assistant message
+    // The resumed run keeps streaming into the same assistant message, timed afresh
+    updateLast((m) => ({ ...m, startedAt: Date.now(), thoughtMs: undefined }));
     run(`${API}/chat/${threadId}/resume`, { action });
   }
 
@@ -296,15 +319,16 @@ export default function Chat() {
                         <Sparkles className="size-3.5" />
                       </span>
                       <div className="min-w-0 flex-1 space-y-3">
-                        {m.content ? (
+                        <Steps
+                          events={m.events}
+                          live={streaming && i === messages.length - 1}
+                          answering={!!m.content}
+                          thoughtMs={m.thoughtMs}
+                        />
+                        {m.content && (
                           <Streamdown plugins={plugins} isAnimating={streaming && i === messages.length - 1}>
                             {m.content}
                           </Streamdown>
-                        ) : (
-                          streaming &&
-                          i === messages.length - 1 && (
-                            <p className="animate-pulse pt-0.5 text-sm text-muted-foreground">Thinking...</p>
-                          )
                         )}
                         {i === messages.length - 1 && pending && (
                           <ApprovalCard

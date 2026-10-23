@@ -12,6 +12,8 @@ class Settings(BaseSettings):
         "gpt-oss:latest",
         "llama3.1:8b",
     ]
+    # Models with Ollama's thinking capability; others error if asked to reason
+    reasoning_models: list[str] = ["qwen3:8b", "gpt-oss:latest"]
     phoenix_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project: str = "agent-chat"
     tavily_api_key: str = ""
