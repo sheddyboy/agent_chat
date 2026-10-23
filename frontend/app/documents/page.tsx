@@ -1,7 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
+import { AlertCircle, CheckCircle2, FileText, Menu, Upload } from "lucide-react";
+import { Sidebar } from "@/components/sidebar";
+import { Button } from "@/components/ui/button";
 import { streamEvents, type ChatEvent } from "@/lib/sse";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -20,6 +22,7 @@ type Upload = {
 
 export default function Documents() {
   const [uploads, setUploads] = useState<Upload[]>([]);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   function update(name: string, change: Partial<Upload>) {
     setUploads((prev) => prev.map((u) => (u.name === name ? { ...u, ...change } : u)));
@@ -57,59 +60,78 @@ export default function Documents() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-3">
-      <header className="flex items-center justify-between">
-        <h1 className="font-semibold">Documents</h1>
-        <Link href="/" className="text-sm hover:underline">
-          Back to chat
-        </Link>
-      </header>
+    <div className="flex h-dvh w-full overflow-hidden">
+      <Sidebar open={showSidebar} onClose={() => setShowSidebar(false)} />
 
-      <label className="block cursor-pointer rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground hover:bg-muted">
-        Click to upload PDFs
-        <input
-          type="file"
-          accept=".pdf"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            for (const file of Array.from(e.target.files ?? [])) upload(file);
-            e.target.value = ""; // allow re-uploading the same file
-          }}
-        />
-      </label>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+          <Button variant="ghost" size="icon-sm" aria-label="Open sidebar" className="md:hidden" onClick={() => setShowSidebar(true)}>
+            <Menu />
+          </Button>
+          <h1 className="text-sm font-medium">Documents</h1>
+        </header>
 
-      <ul className="space-y-3">
-        {uploads.map((u) => {
-          // Each finished stage counts as a quarter of the bar
-          const stageIndex = u.stage ? STAGES.indexOf(u.stage) : -1;
-          const stageShare = u.total ? u.done / u.total : 0;
-          const pct = u.chunks != null ? 100 : ((stageIndex + stageShare) / STAGES.length) * 100;
-          return (
-            <li key={u.name} className="space-y-1 rounded-lg border p-3 text-sm">
-              <div className="flex justify-between">
-                <span className="font-medium">{u.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {u.error
-                    ? "failed"
-                    : u.chunks != null
-                      ? `${u.chunks} chunks`
-                      : u.stage
-                        ? `${u.stage} ${u.done}/${u.total}`
-                        : "uploading..."}
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded bg-muted">
-                <div
-                  className={`h-full transition-all ${u.error ? "bg-destructive" : "bg-primary"}`}
-                  style={{ width: `${Math.max(pct, 0)}%` }}
-                />
-              </div>
-              {u.error && <p className="text-xs text-destructive">{u.error}</p>}
-            </li>
-          );
-        })}
-      </ul>
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
+            <label className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed bg-card px-6 py-12 text-center transition-colors hover:border-foreground/25 hover:bg-muted/50">
+              <span className="flex size-10 items-center justify-center rounded-full border bg-background">
+                <Upload className="size-4" />
+              </span>
+              <span className="text-sm font-medium">Click to upload PDFs</span>
+              <span className="text-xs text-muted-foreground">Each file is chunked, embedded and stored for search</span>
+              <input
+                type="file"
+                accept=".pdf"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  for (const file of Array.from(e.target.files ?? [])) upload(file);
+                  e.target.value = ""; // allow re-uploading the same file
+                }}
+              />
+            </label>
+
+            <ul className="space-y-2">
+              {uploads.map((u) => {
+                // Each finished stage counts as a quarter of the bar
+                const stageIndex = u.stage ? STAGES.indexOf(u.stage) : -1;
+                const stageShare = u.total ? u.done / u.total : 0;
+                const pct = u.chunks != null ? 100 : ((stageIndex + stageShare) / STAGES.length) * 100;
+                return (
+                  <li key={u.name} className="space-y-2 rounded-xl border bg-card p-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      {u.error ? (
+                        <AlertCircle className="size-4 shrink-0 text-destructive" />
+                      ) : u.chunks != null ? (
+                        <CheckCircle2 className="size-4 shrink-0" />
+                      ) : (
+                        <FileText className="size-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate font-medium">{u.name}</span>
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                        {u.error
+                          ? "failed"
+                          : u.chunks != null
+                            ? `${u.chunks} chunks`
+                            : u.stage
+                              ? `${u.stage} ${u.done}/${u.total}`
+                              : "uploading..."}
+                      </span>
+                    </div>
+                    <div className="h-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full transition-all ${u.error ? "bg-destructive" : "bg-foreground"}`}
+                        style={{ width: `${Math.max(pct, 0)}%` }}
+                      />
+                    </div>
+                    {u.error && <p className="text-xs text-destructive">{u.error}</p>}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
