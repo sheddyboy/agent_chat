@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 150
     upload_dir: str = "uploads"
     notes_dir: str = "notes"
-    checkpoint_db: str = "checkpoints.db"
+    db_path: str = "app.db"  # LangGraph checkpoints plus our own tables
 
     mcp_config: str = "mcp_servers.json"
     mcp_workspace: str = (

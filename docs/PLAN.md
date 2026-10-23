@@ -84,7 +84,9 @@ class ChatState(TypedDict):
 | POST | `/chat/{thread_id}/resume` | `{"action": "approve" \| "reject"}`. Returns an SSE stream |
 | POST | `/documents` | Upload. Returns an SSE stream of ingestion progress |
 | GET | `/documents/{doc_id}` | Chunk count for a document |
-| GET | `/threads/{thread_id}` | Thread history from the checkpointer |
+| GET | `/threads` | `?limit=30&before=<cursor>`. Recent chats, newest first, `{threads, next}` |
+| GET | `/threads/{thread_id}` | Title, model, tools, think and `messages` rebuilt from the checkpointer in the frontend's shape |
+| DELETE | `/threads/{thread_id}` | Removes the thread row and its checkpoints |
 | GET | `/models` | `{models, default}` for the model switcher |
 | GET | `/tools` | `[{name, description, group, sensitive}]`, `group` is `local` or the MCP server |
 
@@ -136,10 +138,20 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **11c. Guard.** `injection_score` on `deepset/prompt-injections`, precision, recall and false positive rate at several thresholds.
   - [x] **11d. Tools.** 31 written prompts across every local tool plus no-tool cases, expected tool vs first tool call.
   Done when: each suite runs with one `uv run python -m evals.<suite>` and shows up as experiments in Phoenix.
+- [ ] **12. Chat persistence.** Chats survive a reload, like Claude: a URL per chat, paged recents, delete.
+  - [x] **12a. Backend threads.** `db.py` with a `threads` table in `app.db`, `GET /threads` (keyset paging), `GET /threads/{id}` (history rebuilt by `history.py`), `DELETE /threads/{id}`.
+  - [ ] **12b. Frontend chats.** `/c/[id]` route, sidebar loads paged recents from the backend, open and delete.
+  - [ ] **12c. Auto titles.** Short LLM title after the first turn, `title` SSE event.
+  Done when: a refresh reopens any chat with its messages, sources and activity.
+- [ ] **13. Attachments.** Attach PDFs to a chat like Claude's `+` button; questions only search the attached files.
+  - [ ] **13a. Backend scoping.** `documents` table, `uploads/{doc_id}/name`, `GET /documents`, `attachments` in state, filtered search.
+  - [ ] **13b. Composer upload.** `+` button, upload chips with progress, send gating.
+  - [ ] **13c. Library picker.** "From library" in the `+` menu, persistent Documents page, "Ask about this".
+  Done when: two chats with different attachments get answers only from their own files.
 
 ## Later ideas
 
-Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, image generation, `guard_output` node.
+Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, image generation, `guard_output` node, rename and search chats, `@` mentions for documents, full-text context for small documents.
 
 ## Decisions log
 
@@ -153,6 +165,9 @@ Deep research subgraph, long-term memory, conversation branching, artifacts pane
 - Sources ride on the `search_documents` ToolMessage `artifact` instead of a `sources` state key: no reducer conflicts on parallel calls, and they stay tied to their turn once the checkpointer lands.
 - Tools emit fully formed events through `get_stream_writer()`; `/chat` forwards every `custom` chunk as is.
 - SQLite checkpointer for local-first simplicity.
+- One SQLite file (`app.db`) holds LangGraph's checkpoints and our own tables; our code uses stdlib `sqlite3` with a short-lived connection per call.
+- The checkpointer is the source of truth for messages. The `threads` table is only an index for the sidebar; `GET /threads/{id}` rebuilds the UI messages and events from the checkpoint (no `ms` or `trace_id`, those are not stored).
+- Recent chats use keyset paging on `(updated_at, thread_id)` so pages stay stable while new chats arrive.
 - Single event vocabulary with a `type` field for all streams.
 - Tavily for web search; the one online dependency, needs `TAVILY_API_KEY`.
 - `save_note` is the first sensitive tool; more join `SENSITIVE_TOOLS` with one line each.

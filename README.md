@@ -54,7 +54,7 @@ flowchart LR
     subgraph Local["Local services and storage"]
         OL["Ollama<br/>chat + embeddings"]
         QD[("Qdrant<br/>local folder")]
-        SQ[("SQLite<br/>checkpoints.db")]
+        SQ[("SQLite<br/>app.db")]
         PH["Phoenix<br/>traces + experiments"]
     end
 
@@ -468,7 +468,7 @@ Backend settings are in [backend/config.py](backend/config.py) (pydantic-setting
 | `retrieval_k` / `rerank_top_n` | `20` / `5` | |
 | `rerank_model` | `Xenova/ms-marco-MiniLM-L-6-v2` | |
 | `guard_model` / `guard_threshold` | `protectai/deberta-v3-base-prompt-injection-v2` / `0.9` | |
-| `upload_dir`, `notes_dir`, `checkpoint_db` | `uploads`, `notes`, `checkpoints.db` | |
+| `upload_dir`, `notes_dir`, `db_path` | `uploads`, `notes`, `app.db` | |
 | `mcp_config` / `mcp_workspace` | `mcp_servers.json` / `workspace` | The workspace must match the filesystem root in the JSON |
 
 Frontend environment:

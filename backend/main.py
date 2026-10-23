@@ -6,10 +6,12 @@ from pathlib import Path
 from typing import Literal
 
 from config import settings
+from db import delete_thread, get_thread, init_db, list_threads, touch_thread
 from events import event
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
+from history import to_ui_messages
 from ingestion.pipeline import ingest
 from ingestion.store import count
 from langchain_core.messages import AIMessageChunk, HumanMessage
@@ -36,9 +38,10 @@ graph = None  # built in lifespan once the checkpointer is open
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     global graph
+    init_db()
     # MCP tools join ALL_TOOLS before the graph builds its ToolNode
     ALL_TOOLS.extend(await load_mcp_tools())
-    async with AsyncSqliteSaver.from_conn_string(settings.checkpoint_db) as saver:
+    async with AsyncSqliteSaver.from_conn_string(settings.db_path) as saver:
         graph = build_graph(saver)
         yield
 
@@ -137,6 +140,7 @@ async def stream_graph(input, thread_id: str, span):
 
 async def stream_chat(req: ChatRequest):
     thread_id = req.thread_id or str(uuid.uuid4())
+    touch_thread(thread_id, req.message[:60])
     with tracer.start_as_current_span("chat", openinference_span_kind="chain") as span:
         span.set_input(req.message)
         input = {
@@ -152,6 +156,7 @@ async def stream_chat(req: ChatRequest):
 
 
 async def stream_resume(thread_id: str, action: str):
+    touch_thread(thread_id, "")  # the row exists, so this only bumps updated_at
     with tracer.start_as_current_span("resume", openinference_span_kind="chain") as span:
         span.set_input(action)
         async for ev in stream_graph(Command(resume=action), thread_id, span):
@@ -198,6 +203,34 @@ async def resume(thread_id: str, req: ResumeRequest):
     if not state.interrupts:
         raise HTTPException(409, "no pending approval on this thread")
     return EventSourceResponse(stream_resume(thread_id, req.action))
+
+
+@app.get("/threads")
+def threads(limit: int = 30, before: str | None = None):
+    return list_threads(limit, before)
+
+
+@app.get("/threads/{thread_id}")
+async def thread(thread_id: str):
+    row = get_thread(thread_id)
+    if not row:
+        raise HTTPException(404, "thread not found")
+    state = await graph.aget_state({"configurable": {"thread_id": thread_id}})  # pyright: ignore[reportOptionalMemberAccess]
+    values = state.values
+    return {
+        **row,
+        "model": values.get("model"),
+        "enabled_tools": values.get("enabled_tools"),
+        "think": values.get("think", False),
+        "messages": to_ui_messages(values.get("messages", []), state.interrupts, thread_id),
+    }
+
+
+@app.delete("/threads/{thread_id}")
+async def remove_thread(thread_id: str):
+    await graph.checkpointer.adelete_thread(thread_id)  # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
+    delete_thread(thread_id)
+    return {"deleted": thread_id}
 
 
 async def stream_ingest(path: Path, doc_name: str):
