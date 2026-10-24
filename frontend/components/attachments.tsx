@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, FileText, Library, Loader2, Plus, Upload, X } from "lucide-react";
+import { AlertCircle, Check, FileText, ImageIcon, Library, Loader2, Plus, Upload, X } from "lucide-react";
+import { IMAGE_TYPES } from "@/lib/upload";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -18,6 +19,12 @@ export type Draft = {
   ready: boolean;
   error?: string;
 };
+// An image sent with a message; it belongs to that message only
+export type ImageRef = { image_id: string; name: string };
+// An image picked in the composer; ready once imageId is set
+export type ImageDraft = { key: string; name: string; imageId?: string; error?: string };
+
+export const imageUrl = (id: string) => `${API}/images/${id}`;
 
 const chip = "flex h-8 max-w-56 items-center gap-1.5 rounded-lg border bg-background px-2 text-xs";
 
@@ -27,14 +34,16 @@ export type LibraryDoc = { doc_id: string; name: string; pages: number | null; s
 const menuItem =
   "flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
 
-// The composer's + button: upload new PDFs, or pick ones already in the library.
+// The composer's + button: upload new PDFs or images, or pick PDFs already in the library.
 // `selected` holds the doc ids already in the composer; onToggle adds or removes one.
 export function AttachMenu({
   onFiles,
+  onImages,
   selected,
   onToggle,
 }: {
   onFiles: (files: File[]) => void;
+  onImages: (files: File[]) => void;
   selected: string[];
   onToggle: (doc: LibraryDoc) => void;
 }) {
@@ -44,6 +53,7 @@ export function AttachMenu({
   const [query, setQuery] = useState("");
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
 
   // Close on a click anywhere outside the menu
   useEffect(() => {
@@ -74,8 +84,8 @@ export function AttachMenu({
           setView("menu");
           setOpen(!open);
         }}
-        title="Attach PDFs"
-        aria-label="Attach PDFs"
+        title="Attach files"
+        aria-label="Attach files"
         aria-expanded={open}
         className={`flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground ${open ? "bg-muted text-foreground" : ""}`}
       >
@@ -92,6 +102,17 @@ export function AttachMenu({
           e.target.value = ""; // picking the same file again still fires
         }}
       />
+      <input
+        ref={imageInput}
+        type="file"
+        accept={IMAGE_TYPES.join(",")}
+        multiple
+        hidden
+        onChange={(e) => {
+          onImages(Array.from(e.target.files ?? []));
+          e.target.value = "";
+        }}
+      />
       {open && (
         <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border bg-popover p-1.5 text-sm shadow-xl">
           {view === "menu" ? (
@@ -106,6 +127,17 @@ export function AttachMenu({
               >
                 <Upload />
                 Upload PDFs
+              </button>
+              <button
+                type="button"
+                className={menuItem}
+                onClick={() => {
+                  setOpen(false);
+                  imageInput.current?.click();
+                }}
+              >
+                <ImageIcon />
+                Upload images
               </button>
               <button type="button" className={menuItem} onClick={openLibrary}>
                 <Library />
@@ -186,5 +218,46 @@ export function AttachmentChip({ attachment }: { attachment: Attachment }) {
       <FileText className="size-3.5 shrink-0 text-muted-foreground" />
       <span className="min-w-0 truncate">{attachment.name}</span>
     </div>
+  );
+}
+
+// An image in the composer: a spinner while it uploads, then its thumbnail
+export function ImageChip({ draft, onRemove }: { draft: ImageDraft; onRemove: () => void }) {
+  return (
+    <div
+      className={`relative flex size-14 items-center justify-center overflow-hidden rounded-lg border bg-muted ${draft.error ? "border-destructive/50" : ""}`}
+      title={draft.error ?? draft.name}
+    >
+      {draft.error ? (
+        <AlertCircle className="size-4 text-destructive" />
+      ) : draft.imageId ? (
+        // eslint-disable-next-line @next/next/no-img-element -- served by the API, not Next
+        <img src={imageUrl(draft.imageId)} alt={draft.name} className="size-full object-cover" />
+      ) : (
+        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${draft.name}`}
+        className="absolute top-0.5 right-0.5 flex size-4 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-sm hover:text-foreground"
+      >
+        <X className="size-3" />
+      </button>
+    </div>
+  );
+}
+
+// An image on a sent message; opens full size in a new tab
+export function ImageThumb({ image }: { image: ImageRef }) {
+  return (
+    <a href={imageUrl(image.image_id)} target="_blank" rel="noreferrer" title={image.name}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- served by the API, not Next */}
+      <img
+        src={imageUrl(image.image_id)}
+        alt={image.name}
+        className="max-h-40 max-w-60 rounded-xl border object-cover"
+      />
+    </a>
   );
 }

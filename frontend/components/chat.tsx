@@ -11,7 +11,18 @@ import { mermaid } from "@streamdown/mermaid";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
 import { ActivityPanel } from "@/components/activity-panel";
-import { AttachMenu, AttachmentChip, DraftChip, type Attachment, type Draft, type LibraryDoc } from "@/components/attachments";
+import {
+  AttachMenu,
+  AttachmentChip,
+  DraftChip,
+  ImageChip,
+  ImageThumb,
+  type Attachment,
+  type Draft,
+  type ImageDraft,
+  type ImageRef,
+  type LibraryDoc,
+} from "@/components/attachments";
 import { ApprovalCard } from "@/components/approval-card";
 import { MicButton } from "@/components/mic-button";
 import { Sidebar } from "@/components/sidebar";
@@ -22,7 +33,7 @@ import { ToolPicker, type Tool } from "@/components/tool-picker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { streamEvents, type ChatEvent } from "@/lib/sse";
-import { uploadDocument } from "@/lib/upload";
+import { IMAGE_TYPES, uploadDocument, uploadImage } from "@/lib/upload";
 import { speak } from "@/lib/voice";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -42,11 +53,12 @@ type Message = {
   content: string;
   events: ChatEvent[];
   attachments?: Attachment[];
+  images?: ImageRef[];
   startedAt?: number;
   thoughtMs?: number;
 };
-// thinking: Ollama reports the model can reason before answering
-type Model = { name: string; thinking: boolean };
+// thinking / vision: Ollama reports the model can reason before answering / see images
+type Model = { name: string; thinking: boolean; vision: boolean };
 
 // The pending interrupt of a turn: nothing but "done" (and a new chat's "title")
 // has arrived after it
@@ -65,6 +77,8 @@ export function Chat() {
   const [input, setInput] = useState("");
   // Files picked for the next message; they upload as soon as they are picked
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  // Images picked for the next message; unlike PDFs they belong to that message only
+  const [imageDrafts, setImageDrafts] = useState<ImageDraft[]>([]);
   const [threadId, setThreadId] = useState<string | null>(null);
   // The backend title once it exists; until then the first message stands in
   const [title, setTitle] = useState<string | null>(null);
@@ -119,6 +133,7 @@ export function Chat() {
     setSelected(null);
     setMessages([]);
     setDrafts([]);
+    setImageDrafts([]);
     const res = await fetch(`${API}/threads/${id}`);
     if (opening.current !== id) return; // the user opened another chat meanwhile
     if (!res.ok) return setStatus("missing");
@@ -138,6 +153,7 @@ export function Chat() {
     setSelected(null);
     setMessages([]);
     setDrafts([]);
+    setImageDrafts([]);
     setThreadId(null);
     setTitle(null);
     setModel(defaultModel);
@@ -245,6 +261,18 @@ export function Chat() {
     }
   }
 
+  function attachImages(files: File[]) {
+    for (const file of files) {
+      const key = crypto.randomUUID();
+      setImageDrafts((prev) => [...prev, { key, name: file.name }]);
+      const update = (change: Partial<ImageDraft>) =>
+        setImageDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...change } : d)));
+      uploadImage(file)
+        .then((img) => update({ imageId: img.image_id }))
+        .catch((e) => update({ error: (e as Error).message }));
+    }
+  }
+
   // Library files are already ingested, so their chips are ready at once
   function addFromLibrary(doc: LibraryDoc) {
     setDrafts((prev) =>
@@ -261,22 +289,27 @@ export function Chat() {
 
   const last = messages[messages.length - 1];
   const canThink = models.find((m) => m.name === model)?.thinking ?? false;
+  const canSee = models.find((m) => m.name === model)?.vision ?? false;
   const pending = last ? pendingInterrupt(last.events) : null;
   // A failed chip also blocks sending until it is removed
-  const uploading = drafts.some((d) => !d.ready);
+  const uploading = drafts.some((d) => !d.ready) || imageDrafts.some((d) => !d.imageId);
+  // Images only go to a model that can see them
+  const blind = imageDrafts.length > 0 && !canSee;
 
   async function send() {
     const message = input.trim();
-    if (!message || streaming || pending || uploading) return;
+    if (!message || streaming || pending || uploading || blind) return;
     const attachments = drafts.map((d) => ({ doc_id: d.docId!, name: d.name }));
+    const images = imageDrafts.map((d) => ({ image_id: d.imageId!, name: d.name }));
     readAloud.current = fromVoice;
     setFromVoice(false);
     setInput("");
     setDrafts([]);
+    setImageDrafts([]);
     setSelected(null);
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: message, events: [], attachments },
+      { role: "user", content: message, events: [], attachments, images },
       { role: "assistant", content: "", events: [], startedAt: Date.now() },
     ]);
     await run(`${API}/chat`, {
@@ -285,6 +318,7 @@ export function Chat() {
       model,
       enabled_tools: enabledTools,
       attachments: attachments.map((a) => a.doc_id),
+      images,
       // A chat switched to a model that can't think must not ask it to
       think: think && canThink,
     });
@@ -311,10 +345,22 @@ export function Chat() {
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
-        // Same rule as the + button's picker: PDFs only
-        attach(Array.from(e.dataTransfer.files).filter((f) => f.name.toLowerCase().endsWith(".pdf")));
+        // Same rule as the + button's pickers: PDFs and png/jpeg/webp images
+        const files = Array.from(e.dataTransfer.files);
+        attach(files.filter((f) => f.name.toLowerCase().endsWith(".pdf")));
+        attachImages(files.filter((f) => IMAGE_TYPES.includes(f.type)));
       }}
     >
+      {imageDrafts.length > 0 && (
+        <div className="space-y-1.5 px-3 pt-3">
+          <div className="flex flex-wrap gap-1.5">
+            {imageDrafts.map((d) => (
+              <ImageChip key={d.key} draft={d} onRemove={() => setImageDrafts((prev) => prev.filter((x) => x.key !== d.key))} />
+            ))}
+          </div>
+          {blind && <p className="text-xs text-muted-foreground">{model} can&apos;t see images, pick a vision model</p>}
+        </div>
+      )}
       {drafts.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-3 pt-3">
           {drafts.map((d) => (
@@ -339,6 +385,7 @@ export function Chat() {
       <div className="flex items-center gap-1 px-2 pb-2">
         <AttachMenu
           onFiles={attach}
+          onImages={attachImages}
           selected={drafts.flatMap((d) => (d.docId ? [d.docId] : []))}
           onToggle={toggleLibrary}
         />
@@ -351,7 +398,7 @@ export function Chat() {
         >
           {models.map((m) => (
             <option key={m.name} value={m.name} className="bg-popover text-popover-foreground">
-              {m.thinking ? `${m.name} · thinks` : m.name}
+              {[m.name, m.thinking && "thinks", m.vision && "sees"].filter(Boolean).join(" · ")}
             </option>
           ))}
         </select>
@@ -385,7 +432,7 @@ export function Chat() {
           size="icon-sm"
           aria-label="Send"
           className="rounded-full"
-          disabled={streaming || !!pending || uploading || !input.trim()}
+          disabled={streaming || !!pending || uploading || blind || !input.trim()}
         >
           {streaming ? <Loader2 className="animate-spin" /> : <ArrowUp />}
         </Button>
@@ -461,6 +508,13 @@ export function Chat() {
                 {messages.map((m, i) =>
                   m.role === "user" ? (
                     <div key={i} className="flex flex-col items-end gap-1.5">
+                      {!!m.images?.length && (
+                        <div className="flex max-w-[80%] flex-wrap justify-end gap-1.5">
+                          {m.images.map((img) => (
+                            <ImageThumb key={img.image_id} image={img} />
+                          ))}
+                        </div>
+                      )}
                       {!!m.attachments?.length && (
                         <div className="flex max-w-[80%] flex-wrap justify-end gap-1.5">
                           {m.attachments.map((a) => (
