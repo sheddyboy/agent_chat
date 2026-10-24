@@ -11,6 +11,7 @@ It is a working showcase of:
 - **Input guard**: an ONNX prompt-injection classifier in front of the agent
 - **Ask about images**: attach a screenshot or photo and ask a local vision model (qwen3-vl) about it
 - **Voice**: local speech to text (Parakeet) and text to speech (Kokoro) on onnxruntime
+- **Draw**: the agent can generate images with SDXL Turbo on the Mac's GPU, shown inline in the answer
 - **Live event streaming** over SSE: tokens, reasoning, node and tool steps, retrieval hits, approvals
 - **Observability and evals** with Phoenix: every chat is a trace, every eval suite is an experiment
 
@@ -95,6 +96,7 @@ flowchart LR
 | MCP | `langchain-mcp-adapters` (`MultiServerMCPClient`) |
 | Guard | `protectai/deberta-v3-base-prompt-injection-v2` on onnxruntime (no torch) |
 | Voice | `onnx-asr` with `nemo-parakeet-tdt-0.6b-v2` (int8), `kokoro-onnx` with Kokoro 82M (int8) |
+| Image generation | `diffusers` with `stabilityai/sdxl-turbo` (fp16) and `madebyollin/sdxl-vae-fp16-fix` on MPS |
 | Observability | Phoenix (`arize-phoenix-otel` + OpenInference LangChain instrumentation) |
 | Frontend | Next.js, Tailwind, shadcn/ui, Streamdown (code, math, Mermaid) |
 
@@ -238,6 +240,7 @@ sequenceDiagram
 | `tool_start` | `id`, `name`, `args` | `agent` update with tool calls |
 | `tool_end` | `id`, `name`, `output` (first 500 chars), `ms` | `tools` or `approval` update |
 | `retrieval` | `query`, `hits: [{doc, doc_id, page, score, text}]` | `custom`, from `search_documents` |
+| `image` | `image_id`, `prompt` | `custom`, from `generate_image` |
 | `ingestion` | `doc_id`, `stage` (load / chunk / embed / store), `done`, `total` | ingestion pipeline |
 | `interrupt` | `tool_calls`, `thread_id` | `__interrupt__` update |
 | `guard` | `blocked`, `score` | `custom`, from `guard_input` |
@@ -256,6 +259,7 @@ Local tools live in [backend/tools/](backend/tools/), one file each, registered 
 | `calculator` | Safe arithmetic via an AST walker (`+ - * / // % **`) | |
 | `search_documents` | Hybrid search + rerank over uploaded documents | |
 | `save_note` | Writes a markdown note to `notes/` | yes |
+| `generate_image` | Draws a 512x512 image with SDXL Turbo, stored like uploaded images | yes |
 | `web_search` | Tavily search, registered only when `TAVILY_API_KEY` is set | |
 
 MCP servers are declared in [backend/mcp_servers.json](backend/mcp_servers.json) in `MultiServerMCPClient` format and loaded once at startup:
@@ -489,6 +493,9 @@ Backend settings are in [backend/config.py](backend/config.py) (pydantic-setting
 | `stt_model` | `nemo-parakeet-tdt-0.6b-v2` | Any `onnx-asr` model name; English only by default |
 | `tts_voice` / `tts_speed` | `af_heart` / `1.0` | Kokoro voice names are listed in its VOICES.md |
 | `voice_dir` | `voice_models` | Kokoro files, downloaded on first use |
+| `image_model` / `image_vae` | `stabilityai/sdxl-turbo` / `madebyollin/sdxl-vae-fp16-fix` | About 7 GB, downloaded to the Hugging Face cache on the first drawing |
+| `image_steps` | `2` | 1 to 4 for Turbo |
+| `image_unload_after_s` | `300` | Idle seconds before the image model is freed |
 
 Frontend environment:
 
@@ -510,6 +517,7 @@ backend/
   graph.py            ChatState, nodes, build_graph()
   guard.py            prompt-injection classifier (onnx)
   images.py           store chat images, build image blocks for vision models
+  imagegen.py         SDXL Turbo pipeline on one worker thread, unloaded when idle
   models.py           cached Ollama capabilities (thinking, vision)
   events.py           event(type, **data) helper
   config.py           settings
@@ -543,4 +551,5 @@ The rule is extend by adding, not rewiring.
 - **The first filesystem MCP call takes ~20s.** Each call spawns a fresh `npx` process. Expected for now.
 - **`web_search` is missing from the tool picker.** Set `TAVILY_API_KEY` in `backend/.env` and restart.
 - **A model has no thinking toggle.** Only models whose Ollama capabilities include `thinking` get one; a model that is not pulled shows without it.
+- **The first drawing takes a while.** The first call downloads about 7 GB, and every cold start loads the model (10 to 15 s). Warm drawings take a few seconds. SDXL Turbo is under a non-commercial research license.
 - **Prices render as math.** Inline `$...$` math is on in Streamdown, so text with two dollar amounts can occasionally be read as a formula.

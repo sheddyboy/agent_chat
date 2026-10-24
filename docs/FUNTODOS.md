@@ -8,7 +8,7 @@ Ideas pulled from Hugging Face (trending models and Spaces, October 2026) that w
 |---|---|---|---|---|
 | F1 | Voice mode (done, slice 14) | Parakeet 0.6B, Kokoro 82M | Yes, easily | Medium |
 | F2 | Ask about images (done, slice 15) | qwen3-vl 8B via Ollama | Yes | Small |
-| F3 | Draw tool | SDXL Turbo (3B) | Yes, but heavy | Medium |
+| F3 | Draw tool (done, slice 16) | SDXL Turbo (3B) | Yes, but heavy | Medium |
 | F4 | HF Spaces over MCP | Whatever the Space runs | No, cloud | Small |
 | F5 | Chat with audio | Parakeet + pyannote diarization | Yes | Medium |
 | F6 | Quiz me on my docs | Current chat model | Yes | Small |
@@ -30,10 +30,10 @@ Machine: M4 Pro, 24 GB unified memory. The chat model (`qwen3:8b`, about 6 GB lo
   - Extends the slice 13 `+` menu with image types.
   - Local: yes, about 3 to 6 GB. The model switcher already exists, so this is mostly frontend plus passing image bytes through.
 
-- [ ] **F3. Draw tool.** `generate_image` tool the agent can call, image shown inline in the chat.
-  - `stabilityai/sdxl-turbo` via `diffusers` on MPS, 1 to 4 steps. Upgrade path: `FLUX-3-Image-Klein` GGUF.
+- [x] **F3. Draw tool.** `generate_image` tool the agent can call, image shown inline in the chat.
+  - `stabilityai/sdxl-turbo` via `diffusers` on MPS, 2 steps, with the fp16-fix VAE. Ollama dropped image generation, so it runs in process. Upgrade path: FLUX.2 Klein via `mflux`.
   - Goes in `SENSITIVE_TOOLS` so the approval card shows before it runs (it is slow).
-  - Local: yes, about 7 GB and a few seconds per image. Unload Ollama models first if memory is tight.
+  - Local: yes, about 7 GB on the GPU. Warm drawings take a few seconds, a cold start 10 to 15 s, and the model is freed after 5 idle minutes.
 
 - [ ] **F4. Hugging Face Spaces over MCP.** Add the Hugging Face MCP server to the optional online block in `mcp_servers.json`.
   - Gives the agent Spaces like TRELLIS.2 (image to 3D), image editors and video models.

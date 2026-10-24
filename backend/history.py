@@ -40,6 +40,8 @@ def to_ui_messages(messages: list, interrupts, thread_id: str) -> list[dict]:
             if msg.name == "search_documents" and msg.artifact:
                 query = args.get(msg.tool_call_id, {}).get("query", "")
                 events.append({"type": "retrieval", "query": query, "hits": msg.artifact})
+            if msg.name == "generate_image" and msg.artifact:
+                events.append({"type": "image", **msg.artifact})
             events.append(
                 {"type": "tool_end", "id": msg.tool_call_id, "name": msg.name, "output": msg.text[:500]}
             )

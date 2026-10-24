@@ -167,9 +167,14 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **15b. Composer.** "Upload images" in the `+` menu and drag-and-drop, downscaled in the browser to 1536 px before upload. Thumbnail chips in the composer, thumbnails on sent and reopened messages. Send is blocked with a hint while images are attached and the model can't see.
   Done when: ask qwen3-vl about a screenshot, then continue the same chat on a text model without errors.
 
+- [x] **16. Draw tool.** The agent draws pictures with a local diffusion model (F3 in `FUNTODOS.md`). Ollama 0.40.9 has no image generation, so it runs in process.
+  - [x] **16a. Backend.** `imagegen.py` loads SDXL Turbo with `diffusers` on MPS on first use (2 steps, 512x512, no guidance) and frees it after 5 idle minutes. All torch work runs on one worker thread, since MPS hung when the pipeline was used from several tool threads. The fp16-fix VAE replaces the stock one, whose fp32 upcast next to Ollama made the GPU thrash. `tools/generate_image.py` stores the PNG with `save_image`, emits an `image` event, and returns the id as the artifact so `history.py` rebuilds it. Sensitive, so the approval card shows the prompt first.
+  - [x] **16b. Frontend.** `image` events render inline above the answer with `ImageThumb`, live and on reopened chats.
+  Done when: approve two drawings in a row in one chat, both show inline and survive a refresh, and a rejected call shows no image.
+
 ## Later ideas
 
-Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, image generation, `guard_output` node, rename and search chats, `@` mentions for documents, full-text context for small documents.
+Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, `guard_output` node, rename and search chats, `@` mentions for documents, full-text context for small documents.
 
 ## Decisions log
 

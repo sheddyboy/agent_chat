@@ -2,14 +2,16 @@ from config import settings
 
 from tools.calculator import calculator
 from tools.datetime_tool import get_datetime
+from tools.generate_image import generate_image
 from tools.save_note import save_note
 from tools.search_documents import search_documents
 
-ALL_TOOLS = [get_datetime, calculator, search_documents, save_note]
+ALL_TOOLS = [get_datetime, calculator, search_documents, save_note, generate_image]
 
 # Calls to these pause the run in the approval node until the user decides
 SENSITIVE_TOOLS = {
     "save_note",
+    "generate_image",  # slow and memory hungry
     # Filesystem MCP tools that change files
     "write_file",
     "edit_file",
