@@ -13,6 +13,7 @@ import "streamdown/styles.css";
 import { ActivityPanel } from "@/components/activity-panel";
 import { AttachMenu, AttachmentChip, DraftChip, type Attachment, type Draft, type LibraryDoc } from "@/components/attachments";
 import { ApprovalCard } from "@/components/approval-card";
+import { MicButton } from "@/components/mic-button";
 import { Sidebar } from "@/components/sidebar";
 import { SourcesPanel } from "@/components/sources-panel";
 import { Steps } from "@/components/steps";
@@ -353,11 +354,17 @@ export function Chat() {
           <Brain className="size-3.5" />
           Think
         </button>
+        <div className="ml-auto">
+          <MicButton
+            onText={(text) => setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text))}
+            disabled={streaming || !!pending}
+          />
+        </div>
         <Button
           type="submit"
           size="icon-sm"
           aria-label="Send"
-          className="ml-auto rounded-full"
+          className="rounded-full"
           disabled={streaming || !!pending || uploading || !input.trim()}
         >
           {streaming ? <Loader2 className="animate-spin" /> : <ArrowUp />}
