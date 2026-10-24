@@ -42,7 +42,7 @@ flowchart LR
     end
 
     subgraph Backend["FastAPI backend"]
-        API["main.py<br/>routes + SSE"]
+        API["routes/<br/>stream.py to SSE"]
         G["LangGraph<br/>graph.py"]
         T["Local tools"]
         M["MCP tools"]
@@ -484,7 +484,10 @@ Local data (`qdrant_data/`, `eval_qdrant_data/`, `uploads/`, `notes/`, `workspac
 
 ```
 backend/
-  main.py             FastAPI app, routes, graph stream to SSE
+  main.py             FastAPI app, lifespan, CORS, include_router
+  routes/             one APIRouter per URL prefix: chat, threads, documents, catalog
+  stream.py           graph stream to SSE events
+  tracing.py          Phoenix register() and shared tracer
   graph.py            ChatState, nodes, build_graph()
   guard.py            prompt-injection classifier (onnx)
   events.py           event(type, **data) helper
