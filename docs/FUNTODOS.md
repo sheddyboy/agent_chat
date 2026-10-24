@@ -7,7 +7,7 @@ Ideas pulled from Hugging Face (trending models and Spaces, October 2026) that w
 | # | Idea | Models | Runs locally? | Effort |
 |---|---|---|---|---|
 | F1 | Voice mode (done, slice 14) | Parakeet 0.6B, Kokoro 82M | Yes, easily | Medium |
-| F2 | Ask about images | Qwen3.5 4B/9B vision via Ollama | Yes | Small |
+| F2 | Ask about images (done, slice 15) | qwen3-vl 8B via Ollama | Yes | Small |
 | F3 | Draw tool | SDXL Turbo (3B) | Yes, but heavy | Medium |
 | F4 | HF Spaces over MCP | Whatever the Space runs | No, cloud | Small |
 | F5 | Chat with audio | Parakeet + pyannote diarization | Yes | Medium |
@@ -25,7 +25,7 @@ Machine: M4 Pro, 24 GB unified memory. The chat model (`qwen3:8b`, about 6 GB lo
   - Backend: `POST /transcribe` (audio in, text out) and `POST /speak` (text in, audio out). One file each.
   - Local: yes. Both models are under 1 GB and fine on CPU or MPS.
 
-- [ ] **F2. Ask about images.** Attach a screenshot or photo like a PDF and ask about it.
+- [x] **F2. Ask about images.** Attach a screenshot or photo like a PDF and ask about it.
   - A vision chat model in Ollama (Qwen3.5 4B or 9B, or another vision tag Ollama ships). Image goes in the message, no ingestion needed.
   - Extends the slice 13 `+` menu with image types.
   - Local: yes, about 3 to 6 GB. The model switcher already exists, so this is mostly frontend plus passing image bytes through.

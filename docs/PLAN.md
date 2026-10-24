@@ -162,6 +162,11 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **14d. Auto-read.** A turn that started from the mic is read aloud when it finishes (after the approval, if it paused for one). What's playing lives in a small store in `lib/voice.ts`, so the answer's speaker button shows Stop either way.
   Done when: ask a question by voice, edit the transcript, send, and hear the answer start within about a second.
 
+- [x] **15. Ask about images.** Attach a screenshot or photo and ask a vision model about it (F2 in `FUNTODOS.md`).
+  - [x] **15a. Backend.** `images.py` stores images under a content hash in `uploads/images`. `routes/images.py` with `POST /images` (png, jpeg, webp, 10 MB cap) and `GET /images/{id}`. `/chat` takes `images`, kept as ids on the HumanMessage; `with_images` in the agent node sends the real image only to models Ollama lists with `vision`, others get `[image: name]`. `models.py` caches Ollama capabilities for `/models` (`thinking`, `vision`) and the agent. `num_ctx` raised to 8192, since tool schemas plus an image overflow Ollama's 4096 default.
+  - [x] **15b. Composer.** "Upload images" in the `+` menu and drag-and-drop, downscaled in the browser to 1536 px before upload. Thumbnail chips in the composer, thumbnails on sent and reopened messages. Send is blocked with a hint while images are attached and the model can't see.
+  Done when: ask qwen3-vl about a screenshot, then continue the same chat on a text model without errors.
+
 ## Later ideas
 
 Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, image generation, `guard_output` node, rename and search chats, `@` mentions for documents, full-text context for small documents.

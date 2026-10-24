@@ -9,6 +9,7 @@ It is a working showcase of:
 - **RAG as a tool**: PDF ingestion, hybrid dense + BM25 search, cross-encoder reranking, inline citations
 - **Human-in-the-loop**: sensitive tools pause the run until you approve or reject
 - **Input guard**: an ONNX prompt-injection classifier in front of the agent
+- **Ask about images**: attach a screenshot or photo and ask a local vision model (qwen3-vl) about it
 - **Voice**: local speech to text (Parakeet) and text to speech (Kokoro) on onnxruntime
 - **Live event streaming** over SSE: tokens, reasoning, node and tool steps, retrieval hits, approvals
 - **Observability and evals** with Phoenix: every chat is a trace, every eval suite is an experiment
@@ -116,6 +117,8 @@ ollama pull qwen3-embedding:0.6b
 # optional, for the model switcher and evals
 ollama pull llama3.1:8b
 ollama pull gpt-oss
+# optional, for asking about images
+ollama pull qwen3-vl:8b
 ```
 
 ### Run
@@ -376,7 +379,8 @@ flowchart TB
 
 | Feature | Detail |
 |---|---|
-| Model switcher | Lists `chat_models` from `/models`. The thinking toggle appears only for models with Ollama's `thinking` capability. |
+| Model switcher | Lists `chat_models` from `/models`. The thinking toggle appears only for models with Ollama's `thinking` capability; models with `vision` are marked "sees". |
+| Images | "Upload images" in the `+` menu or drag and drop (png, jpeg, webp). Downscaled in the browser to 1536 px, shown as thumbnails on the message. Send is blocked while images are attached and the model can't see. |
 | Tool picker | Per-chat toggles from `/tools`, grouped by `local` or MCP server, sensitive tools marked. Stored in graph state, so resumes keep them. |
 | Activity panel | Tool calls with args, output and timing for the selected turn, plus a "View trace" link to Phoenix. |
 | Sources panel | Reranked passages with document, page and score. |
@@ -444,18 +448,20 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| `POST` | `/chat` | `{message, model?, thread_id?, enabled_tools?, think?}` | SSE stream. A new `thread_id` is created when omitted. |
+| `POST` | `/chat` | `{message, model?, thread_id?, enabled_tools?, think?, attachments?, images?}` | SSE stream. A new `thread_id` is created when omitted. |
 | `POST` | `/chat/{thread_id}/resume` | `{"action": "approve" \| "reject"}` | SSE stream, or `409` with no pending approval |
 | `POST` | `/documents` | multipart `file` | SSE stream of `ingestion` events, then `done` |
 | `GET` | `/documents/{doc_id}` | | `{doc_id, chunks}` |
-| `GET` | `/models` | | `{models: [{name, thinking}], default}` |
+| `GET` | `/models` | | `{models: [{name, thinking, vision}], default}` |
+| `POST` | `/images` | multipart `file` (png, jpeg, webp, up to 10 MB) | `{image_id, name}`, or `400` |
+| `GET` | `/images/{image_id}` | | the image, or `404` |
 | `GET` | `/tools` | | `[{name, description, group, sensitive}]` |
 | `POST` | `/voice/transcribe` | multipart `file` (16-bit PCM WAV) | `{text}`, or `400` for unreadable audio |
 | `POST` | `/voice/speak` | `{text}` (1 to 1000 chars) | `audio/wav`, 24 kHz mono |
 
 The first voice call downloads its model (about 650 MB for speech to text, 140 MB for text to speech), so it takes a while once. After that a sentence takes well under a second each way.
 
-`enabled_tools` left out keeps the thread's earlier choice; never set means all tools.
+`enabled_tools` left out keeps the thread's earlier choice; never set means all tools. `images` is a list of `{image_id, name}` from `POST /images`; they belong to that message only. A model without Ollama's `vision` capability gets an `[image: name]` placeholder instead.
 
 ## Configuration
 
@@ -465,7 +471,8 @@ Backend settings are in [backend/config.py](backend/config.py) (pydantic-setting
 |---|---|---|
 | `ollama_url` | `http://localhost:11434` | |
 | `default_model` | `qwen3:8b` | |
-| `chat_models` | `qwen3:8b`, `gpt-oss:latest`, `llama3.1:8b` | Offered in the model switcher; need Ollama's `tools` capability |
+| `chat_models` | `qwen3:8b`, `gpt-oss:latest`, `llama3.1:8b`, `qwen3-vl:8b` | Offered in the model switcher; need Ollama's `tools` capability |
+| `num_ctx` | `8192` | Context window for the agent. Ollama's 4096 default is overflowed by all tool schemas plus an image |
 | `phoenix_endpoint` | `http://localhost:6006/v1/traces` | |
 | `phoenix_project` | `agent-chat` | |
 | `tavily_api_key` | empty | `web_search` is registered only when set |
@@ -477,6 +484,7 @@ Backend settings are in [backend/config.py](backend/config.py) (pydantic-setting
 | `rerank_model` | `Xenova/ms-marco-MiniLM-L-6-v2` | |
 | `guard_model` / `guard_threshold` | `protectai/deberta-v3-base-prompt-injection-v2` / `0.9` | |
 | `upload_dir`, `notes_dir`, `db_path` | `uploads`, `notes`, `app.db` | |
+| `image_dir` / `image_max_mb` | `uploads/images` / `10` | Chat images, stored under a content hash, never ingested |
 | `mcp_config` / `mcp_workspace` | `mcp_servers.json` / `workspace` | The workspace must match the filesystem root in the JSON |
 | `stt_model` | `nemo-parakeet-tdt-0.6b-v2` | Any `onnx-asr` model name; English only by default |
 | `tts_voice` / `tts_speed` | `af_heart` / `1.0` | Kokoro voice names are listed in its VOICES.md |
@@ -496,11 +504,13 @@ Local data (`qdrant_data/`, `eval_qdrant_data/`, `uploads/`, `notes/`, `workspac
 ```
 backend/
   main.py             FastAPI app, lifespan, CORS, include_router
-  routes/             one APIRouter per URL prefix: chat, threads, documents, catalog, voice
+  routes/             one APIRouter per URL prefix: chat, threads, documents, images, catalog, voice
   stream.py           graph stream to SSE events
   tracing.py          Phoenix register() and shared tracer
   graph.py            ChatState, nodes, build_graph()
   guard.py            prompt-injection classifier (onnx)
+  images.py           store chat images, build image blocks for vision models
+  models.py           cached Ollama capabilities (thinking, vision)
   events.py           event(type, **data) helper
   config.py           settings
   mcp_servers.json    MCP servers loaded at startup
