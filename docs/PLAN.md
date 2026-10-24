@@ -155,7 +155,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **13c. Library picker.** The `+` opens a menu: Upload PDFs, or From library (searchable list of ready docs, toggles chips that are ready at once). The Documents page lists the whole library with status, and "Ask about this" opens `/?attach={doc_id}`.
   Done when: two chats with different attachments get answers only from their own files.
 
-- [ ] **14. Voice mode.** Talk to the agent and hear it answer, all local (F1 in `FUNTODOS.md`).
+- [x] **14. Voice mode.** Talk to the agent and hear it answer, all local (F1 in `FUNTODOS.md`).
   - [x] **14a. Backend.** `voice/stt.py` (Parakeet via onnx-asr) and `voice/tts.py` (Kokoro via kokoro-onnx), both lazy `@lru_cache` loaders. `routes/voice.py` with `POST /voice/transcribe` (16-bit WAV in, `{text}` out) and `POST /voice/speak` (`{text}` in, WAV out).
   - [x] **14b. Mic button.** Push-to-talk in the composer. The browser records, resamples to 16 kHz mono WAV, posts it, and the transcript is appended to the input (no auto-send). Auto-stops at 25 s.
   - [x] **14c. Speaker button.** On each assistant answer. Markdown stripped (code skipped, tables announced), split into sentences, sentence n+1 fetched while n plays. One reply plays at a time.
