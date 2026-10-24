@@ -248,15 +248,15 @@ export function ImageChip({ draft, onRemove }: { draft: ImageDraft; onRemove: ()
   );
 }
 
-// An image on a sent message; opens full size in a new tab
-export function ImageThumb({ image }: { image: ImageRef }) {
+// An image on a sent message or a drawn answer; opens full size in a new tab
+export function ImageThumb({ image, className = "max-h-40 max-w-60" }: { image: ImageRef; className?: string }) {
   return (
     <a href={imageUrl(image.image_id)} target="_blank" rel="noreferrer" title={image.name}>
       {/* eslint-disable-next-line @next/next/no-img-element -- served by the API, not Next */}
       <img
         src={imageUrl(image.image_id)}
         alt={image.name}
-        className="max-h-40 max-w-60 rounded-xl border object-cover"
+        className={`${className} rounded-xl border object-cover`}
       />
     </a>
   );

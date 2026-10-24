@@ -545,6 +545,16 @@ export function Chat() {
                           answering={!!m.content}
                           thoughtMs={m.thoughtMs}
                         />
+                        {/* Pictures from the generate_image tool */}
+                        {m.events
+                          .filter((e) => e.type === "image")
+                          .map((e) => (
+                            <ImageThumb
+                              key={e.image_id as string}
+                              image={{ image_id: e.image_id as string, name: e.prompt as string }}
+                              className="w-full max-w-sm"
+                            />
+                          ))}
                         {m.content && (
                           <Streamdown plugins={plugins} isAnimating={streaming && i === messages.length - 1}>
                             {m.content}
