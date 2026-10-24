@@ -18,6 +18,7 @@ A local-first, ChatGPT/Claude-style agentic chat platform. It showcases agent or
 | LLMs | Ollama via `ChatOllama` (qwen3, gpt-oss) |
 | Embeddings | `qwen3-embedding:0.6b` via Ollama (dense), fastembed `Qdrant/bm25` (sparse) |
 | Rerank | fastembed `Xenova/ms-marco-MiniLM-L-6-v2`, in-process |
+| Voice | `onnx-asr` Parakeet TDT 0.6B v2 (speech to text), `kokoro-onnx` Kokoro 82M (text to speech), both int8 |
 | PDF loading | `langchain-pymupdf4llm` (markdown per page, Tesseract OCR for scans) |
 | Chunking | `MarkdownTextSplitter` from langchain-text-splitters |
 | Vector store | Qdrant local mode (`QdrantClient(path=...)`) via langchain-qdrant |
@@ -40,6 +41,7 @@ backend/
   tools/            # one file per tool, ALL_TOOLS and SENSITIVE_TOOLS in __init__.py
   ingestion/        # loader.py, chunking.py, store.py, pipeline.py
   retrieval/        # hybrid.py, rerank.py
+  voice/            # stt.py, tts.py
 frontend/
 docs/
   PLAN.md
@@ -153,6 +155,13 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **13c. Library picker.** The `+` opens a menu: Upload PDFs, or From library (searchable list of ready docs, toggles chips that are ready at once). The Documents page lists the whole library with status, and "Ask about this" opens `/?attach={doc_id}`.
   Done when: two chats with different attachments get answers only from their own files.
 
+- [ ] **14. Voice mode.** Talk to the agent and hear it answer, all local (F1 in `FUNTODOS.md`).
+  - [x] **14a. Backend.** `voice/stt.py` (Parakeet via onnx-asr) and `voice/tts.py` (Kokoro via kokoro-onnx), both lazy `@lru_cache` loaders. `routes/voice.py` with `POST /voice/transcribe` (16-bit WAV in, `{text}` out) and `POST /voice/speak` (`{text}` in, WAV out).
+  - [ ] **14b. Mic button.** Push-to-talk in the composer. The browser records, resamples to 16 kHz mono WAV, posts it, and the transcript is appended to the input (no auto-send). Auto-stops at 25 s.
+  - [ ] **14c. Speaker button.** On each assistant answer. Markdown stripped (code skipped, tables announced), split into sentences, sentence n+1 fetched while n plays. One reply plays at a time.
+  - [ ] **14d. Auto-read.** Optional: a turn that started from the mic is read aloud when it finishes.
+  Done when: ask a question by voice, edit the transcript, send, and hear the answer start within about a second.
+
 ## Later ideas
 
 Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, image generation, `guard_output` node, rename and search chats, `@` mentions for documents, full-text context for small documents.
@@ -168,6 +177,10 @@ Deep research subgraph, long-term memory, conversation branching, artifacts pane
 - Hybrid search is one Qdrant query (dense + BM25 fused with RRF), top 20, then a cross-encoder reranks to top 5.
 - Sources ride on the `search_documents` ToolMessage `artifact` instead of a `sources` state key: no reducer conflicts on parallel calls, and they stay tied to their turn once the checkpointer lands.
 - Tools emit fully formed events through `get_stream_writer()`; `/chat` forwards every `custom` chunk as is.
+- Voice runs on ONNX (onnx-asr, kokoro-onnx) instead of NeMo or PyTorch: same onnxruntime as the guard and fastembed, small install, espeak bundled by `espeakng-loader`.
+- The browser converts recordings to 16 kHz WAV, so the backend needs no ffmpeg and reads audio with the stdlib `wave` module.
+- Replies are spoken by fetching one sentence at a time from a plain `POST /voice/speak`, prefetching the next while one plays. Fast enough (about 0.2 s per sentence warm) that no streaming audio endpoint is needed.
+- Voice calls are not traced; Phoenix stays focused on LLM spans.
 - SQLite checkpointer for local-first simplicity.
 - One SQLite file (`app.db`) holds LangGraph's checkpoints and our own tables; our code uses stdlib `sqlite3` with a short-lived connection per call.
 - The checkpointer is the source of truth for messages. The `threads` table is only an index for the sidebar; `GET /threads/{id}` rebuilds the UI messages and events from the checkpoint (no `ms` or `trace_id`, those are not stored).

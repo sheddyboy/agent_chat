@@ -9,6 +9,7 @@ It is a working showcase of:
 - **RAG as a tool**: PDF ingestion, hybrid dense + BM25 search, cross-encoder reranking, inline citations
 - **Human-in-the-loop**: sensitive tools pause the run until you approve or reject
 - **Input guard**: an ONNX prompt-injection classifier in front of the agent
+- **Voice**: local speech to text (Parakeet) and text to speech (Kokoro) on onnxruntime
 - **Live event streaming** over SSE: tokens, reasoning, node and tool steps, retrieval hits, approvals
 - **Observability and evals** with Phoenix: every chat is a trace, every eval suite is an experiment
 
@@ -92,6 +93,7 @@ flowchart LR
 | Checkpoints | SQLite (`AsyncSqliteSaver`) |
 | MCP | `langchain-mcp-adapters` (`MultiServerMCPClient`) |
 | Guard | `protectai/deberta-v3-base-prompt-injection-v2` on onnxruntime (no torch) |
+| Voice | `onnx-asr` with `nemo-parakeet-tdt-0.6b-v2` (int8), `kokoro-onnx` with Kokoro 82M (int8) |
 | Observability | Phoenix (`arize-phoenix-otel` + OpenInference LangChain instrumentation) |
 | Frontend | Next.js, Tailwind, shadcn/ui, Streamdown (code, math, Mermaid) |
 
@@ -446,6 +448,10 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 | `GET` | `/documents/{doc_id}` | | `{doc_id, chunks}` |
 | `GET` | `/models` | | `{models: [{name, thinking}], default}` |
 | `GET` | `/tools` | | `[{name, description, group, sensitive}]` |
+| `POST` | `/voice/transcribe` | multipart `file` (16-bit PCM WAV) | `{text}`, or `400` for unreadable audio |
+| `POST` | `/voice/speak` | `{text}` (1 to 1000 chars) | `audio/wav`, 24 kHz mono |
+
+The first voice call downloads its model (about 650 MB for speech to text, 140 MB for text to speech), so it takes a while once. After that a sentence takes well under a second each way.
 
 `enabled_tools` left out keeps the thread's earlier choice; never set means all tools.
 
@@ -470,6 +476,9 @@ Backend settings are in [backend/config.py](backend/config.py) (pydantic-setting
 | `guard_model` / `guard_threshold` | `protectai/deberta-v3-base-prompt-injection-v2` / `0.9` | |
 | `upload_dir`, `notes_dir`, `db_path` | `uploads`, `notes`, `app.db` | |
 | `mcp_config` / `mcp_workspace` | `mcp_servers.json` / `workspace` | The workspace must match the filesystem root in the JSON |
+| `stt_model` | `nemo-parakeet-tdt-0.6b-v2` | Any `onnx-asr` model name; English only by default |
+| `tts_voice` / `tts_speed` | `af_heart` / `1.0` | Kokoro voice names are listed in its VOICES.md |
+| `voice_dir` | `voice_models` | Kokoro files, downloaded on first use |
 
 Frontend environment:
 
@@ -478,14 +487,14 @@ Frontend environment:
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` |
 | `NEXT_PUBLIC_PHOENIX_URL` | `http://localhost:6006` |
 
-Local data (`qdrant_data/`, `eval_qdrant_data/`, `uploads/`, `notes/`, `workspace/`, `*.db`, `.env`) is created inside `backend/` and gitignored.
+Local data (`qdrant_data/`, `eval_qdrant_data/`, `uploads/`, `notes/`, `workspace/`, `voice_models/`, `*.db`, `.env`) is created inside `backend/` and gitignored.
 
 ## Project layout
 
 ```
 backend/
   main.py             FastAPI app, lifespan, CORS, include_router
-  routes/             one APIRouter per URL prefix: chat, threads, documents, catalog
+  routes/             one APIRouter per URL prefix: chat, threads, documents, catalog, voice
   stream.py           graph stream to SSE events
   tracing.py          Phoenix register() and shared tracer
   graph.py            ChatState, nodes, build_graph()
@@ -496,6 +505,7 @@ backend/
   tools/              one file per tool, ALL_TOOLS and SENSITIVE_TOOLS in __init__.py
   ingestion/          loader, chunking, store, pipeline
   retrieval/          hybrid search, rerank
+  voice/              speech to text (stt.py), text to speech (tts.py)
   evals/              hotpot setup, retrieval, answers, guard, tools suites
 frontend/
   app/                chat page, documents page
