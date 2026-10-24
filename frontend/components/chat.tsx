@@ -16,6 +16,7 @@ import { ApprovalCard } from "@/components/approval-card";
 import { MicButton } from "@/components/mic-button";
 import { Sidebar } from "@/components/sidebar";
 import { SourcesPanel } from "@/components/sources-panel";
+import { SpeakButton } from "@/components/speak-button";
 import { Steps } from "@/components/steps";
 import { ToolPicker, type Tool } from "@/components/tool-picker";
 import { Button } from "@/components/ui/button";
@@ -475,6 +476,11 @@ export function Chat() {
                           <Streamdown plugins={plugins} isAnimating={streaming && i === messages.length - 1}>
                             {m.content}
                           </Streamdown>
+                        )}
+                        {m.content && !(streaming && i === messages.length - 1) && (
+                          <div className="-mt-1 -ml-1.5 flex">
+                            <SpeakButton content={m.content} />
+                          </div>
                         )}
                         {i === messages.length - 1 && pending && (
                           <ApprovalCard
