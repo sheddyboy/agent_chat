@@ -13,6 +13,7 @@ class Settings(BaseSettings):
         "qwen3:8b",
         "gpt-oss:latest",
         "llama3.1:8b",
+        "qwen3-vl:8b",  # vision
     ]
     phoenix_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project: str = "agent-chat"
@@ -26,6 +27,8 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 150
     upload_dir: str = "uploads"
+    image_dir: str = "uploads/images"  # chat images, sent to vision models, never ingested
+    image_max_mb: int = 10
     notes_dir: str = "notes"
     db_path: str = "app.db"  # LangGraph checkpoints plus our own tables
 
