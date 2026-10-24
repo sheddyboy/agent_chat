@@ -6,7 +6,7 @@ Ideas pulled from Hugging Face (trending models and Spaces, October 2026) that w
 
 | # | Idea | Models | Runs locally? | Effort |
 |---|---|---|---|---|
-| F1 | Voice mode | Parakeet 0.6B, Kokoro 82M | Yes, easily | Medium |
+| F1 | Voice mode (done, slice 14) | Parakeet 0.6B, Kokoro 82M | Yes, easily | Medium |
 | F2 | Ask about images | Qwen3.5 4B/9B vision via Ollama | Yes | Small |
 | F3 | Draw tool | SDXL Turbo (3B) | Yes, but heavy | Medium |
 | F4 | HF Spaces over MCP | Whatever the Space runs | No, cloud | Small |
@@ -19,7 +19,7 @@ Machine: M4 Pro, 24 GB unified memory. The chat model (`qwen3:8b`, about 6 GB lo
 
 ## Todos
 
-- [ ] **F1. Voice mode.** Mic button in the composer, speaker button on assistant messages.
+- [x] **F1. Voice mode.** Mic button in the composer, speaker button on assistant messages.
   - Speech to text: `nvidia/parakeet-tdt-0.6b-v2` (fast, English) or `nvidia/nemotron-3.5-asr-streaming-0.6b` (live partial transcripts). Fallback `openai/whisper-large-v3`.
   - Text to speech: `hexgrad/Kokoro-82M`, or `gradium/phonon-40m-en` if we want even smaller.
   - Backend: `POST /transcribe` (audio in, text out) and `POST /speak` (text in, audio out). One file each.

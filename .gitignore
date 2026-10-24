@@ -16,3 +16,4 @@ notes/
 *.db
 *.db-*
 workspace/
+voice_models/

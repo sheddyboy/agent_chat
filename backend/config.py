@@ -44,5 +44,10 @@ class Settings(BaseSettings):
     guard_model: str = "protectai/deberta-v3-base-prompt-injection-v2"
     guard_threshold: float = 0.9
 
+    stt_model: str = "nemo-parakeet-tdt-0.6b-v2"
+    tts_voice: str = "af_heart"
+    tts_speed: float = 1.0
+    voice_dir: str = "voice_models"  # Kokoro files, downloaded on first /voice/speak
+
 
 settings = Settings()

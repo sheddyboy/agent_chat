@@ -13,14 +13,17 @@ import "streamdown/styles.css";
 import { ActivityPanel } from "@/components/activity-panel";
 import { AttachMenu, AttachmentChip, DraftChip, type Attachment, type Draft, type LibraryDoc } from "@/components/attachments";
 import { ApprovalCard } from "@/components/approval-card";
+import { MicButton } from "@/components/mic-button";
 import { Sidebar } from "@/components/sidebar";
 import { SourcesPanel } from "@/components/sources-panel";
+import { SpeakButton } from "@/components/speak-button";
 import { Steps } from "@/components/steps";
 import { ToolPicker, type Tool } from "@/components/tool-picker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { streamEvents, type ChatEvent } from "@/lib/sse";
 import { uploadDocument } from "@/lib/upload";
+import { speak } from "@/lib/voice";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 // Models write inline math as $...$, which the default plugin ignores
@@ -81,6 +84,10 @@ export function Chat() {
   // null means the chat never chose, so every tool is on (as in the backend)
   const [enabledTools, setEnabledTools] = useState<string[] | null>(null);
   const [think, setThink] = useState(false);
+  // The composer holds a transcript from the mic (editing it keeps this on)
+  const [fromVoice, setFromVoice] = useState(false);
+  // The turn in flight was asked by voice, so its answer is read aloud when it ends
+  const readAloud = useRef(false);
   const bottom = useRef<HTMLDivElement>(null);
   const opening = useRef<string | null>(null);
 
@@ -206,12 +213,21 @@ export function Chat() {
 
   async function run(url: string, body: unknown) {
     setStreaming(true);
+    let answer = "";
     try {
-      await streamEvents(url, body, onEvent);
+      await streamEvents(url, body, (ev) => {
+        if (ev.type === "token") answer += ev.text;
+        onEvent(ev);
+      });
     } catch (e) {
       appendToLast(`\n\n**Error:** ${(e as Error).message}`);
     }
     setStreaming(false);
+    // A turn paused for approval has no answer yet; it is read once the resumed run ends
+    if (readAloud.current && answer.trim()) {
+      readAloud.current = false;
+      speak(answer);
+    }
   }
 
   function updateDraft(key: string, change: Partial<Draft>) {
@@ -253,6 +269,8 @@ export function Chat() {
     const message = input.trim();
     if (!message || streaming || pending || uploading) return;
     const attachments = drafts.map((d) => ({ doc_id: d.docId!, name: d.name }));
+    readAloud.current = fromVoice;
+    setFromVoice(false);
     setInput("");
     setDrafts([]);
     setSelected(null);
@@ -353,11 +371,20 @@ export function Chat() {
           <Brain className="size-3.5" />
           Think
         </button>
+        <div className="ml-auto">
+          <MicButton
+            onText={(text) => {
+              setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
+              setFromVoice(true);
+            }}
+            disabled={streaming || !!pending}
+          />
+        </div>
         <Button
           type="submit"
           size="icon-sm"
           aria-label="Send"
-          className="ml-auto rounded-full"
+          className="rounded-full"
           disabled={streaming || !!pending || uploading || !input.trim()}
         >
           {streaming ? <Loader2 className="animate-spin" /> : <ArrowUp />}
@@ -468,6 +495,11 @@ export function Chat() {
                           <Streamdown plugins={plugins} isAnimating={streaming && i === messages.length - 1}>
                             {m.content}
                           </Streamdown>
+                        )}
+                        {m.content && !(streaming && i === messages.length - 1) && (
+                          <div className="-mt-1 -ml-1.5 flex">
+                            <SpeakButton content={m.content} />
+                          </div>
                         )}
                         {i === messages.length - 1 && pending && (
                           <ApprovalCard
