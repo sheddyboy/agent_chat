@@ -380,6 +380,8 @@ flowchart TB
 | Tool picker | Per-chat toggles from `/tools`, grouped by `local` or MCP server, sensitive tools marked. Stored in graph state, so resumes keep them. |
 | Activity panel | Tool calls with args, output and timing for the selected turn, plus a "View trace" link to Phoenix. |
 | Sources panel | Reranked passages with document, page and score. |
+| Mic button | Push-to-talk in the composer. Records, converts to 16 kHz WAV in the browser, and appends the transcript to the input; nothing is sent until you press Send. Stops itself at 25 s. |
+| Read aloud | A speaker button under each answer, one answer at a time. Code is skipped and tables are announced. Answers to questions asked by voice are read automatically. |
 | Documents page | Upload with live per-stage progress. Lists uploads from the current browser session only (there is no list endpoint yet). |
 
 ## Observability

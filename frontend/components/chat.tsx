@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { streamEvents, type ChatEvent } from "@/lib/sse";
 import { uploadDocument } from "@/lib/upload";
+import { speak } from "@/lib/voice";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 // Models write inline math as $...$, which the default plugin ignores
@@ -83,6 +84,10 @@ export function Chat() {
   // null means the chat never chose, so every tool is on (as in the backend)
   const [enabledTools, setEnabledTools] = useState<string[] | null>(null);
   const [think, setThink] = useState(false);
+  // The composer holds a transcript from the mic (editing it keeps this on)
+  const [fromVoice, setFromVoice] = useState(false);
+  // The turn in flight was asked by voice, so its answer is read aloud when it ends
+  const readAloud = useRef(false);
   const bottom = useRef<HTMLDivElement>(null);
   const opening = useRef<string | null>(null);
 
@@ -208,12 +213,21 @@ export function Chat() {
 
   async function run(url: string, body: unknown) {
     setStreaming(true);
+    let answer = "";
     try {
-      await streamEvents(url, body, onEvent);
+      await streamEvents(url, body, (ev) => {
+        if (ev.type === "token") answer += ev.text;
+        onEvent(ev);
+      });
     } catch (e) {
       appendToLast(`\n\n**Error:** ${(e as Error).message}`);
     }
     setStreaming(false);
+    // A turn paused for approval has no answer yet; it is read once the resumed run ends
+    if (readAloud.current && answer.trim()) {
+      readAloud.current = false;
+      speak(answer);
+    }
   }
 
   function updateDraft(key: string, change: Partial<Draft>) {
@@ -255,6 +269,8 @@ export function Chat() {
     const message = input.trim();
     if (!message || streaming || pending || uploading) return;
     const attachments = drafts.map((d) => ({ doc_id: d.docId!, name: d.name }));
+    readAloud.current = fromVoice;
+    setFromVoice(false);
     setInput("");
     setDrafts([]);
     setSelected(null);
@@ -357,7 +373,10 @@ export function Chat() {
         </button>
         <div className="ml-auto">
           <MicButton
-            onText={(text) => setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text))}
+            onText={(text) => {
+              setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
+              setFromVoice(true);
+            }}
             disabled={streaming || !!pending}
           />
         </div>

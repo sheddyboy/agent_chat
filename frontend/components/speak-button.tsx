@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { Square, Volume2 } from "lucide-react";
-import { speak } from "@/lib/voice";
+import { getSpeaking, speak, stopSpeaking, subscribeSpeaking } from "@/lib/voice";
 
-// Reads an assistant answer aloud; a second click stops it
+// Reads an assistant answer aloud; a second click stops it. Also shows Stop when the
+// answer was started by auto-read rather than by this button
 export function SpeakButton({ content }: { content: string }) {
-  const [playing, setPlaying] = useState(false);
-  const stopRef = useRef<() => void>(undefined);
+  const playing = useSyncExternalStore(subscribeSpeaking, () => getSpeaking() === content, () => false);
 
-  // Leaving the chat stops this reply's audio
-  useEffect(() => () => stopRef.current?.(), []);
+  // Leaving the chat stops this answer's audio
+  useEffect(
+    () => () => {
+      if (getSpeaking() === content) stopSpeaking();
+    },
+    [content],
+  );
 
   return (
     <button
@@ -18,12 +23,8 @@ export function SpeakButton({ content }: { content: string }) {
       onClick={(e) => {
         // The answer opens the side panel on click; this button shouldn't
         e.stopPropagation();
-        if (playing) {
-          stopRef.current?.();
-        } else {
-          setPlaying(true);
-          stopRef.current = speak(content, () => setPlaying(false));
-        }
+        if (playing) stopSpeaking();
+        else speak(content);
       }}
       title={playing ? "Stop reading" : "Read aloud"}
       aria-label={playing ? "Stop reading" : "Read aloud"}

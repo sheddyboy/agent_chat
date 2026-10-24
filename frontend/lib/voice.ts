@@ -116,12 +116,31 @@ function fetchSpeech(text: string, signal: AbortSignal): Promise<Blob> {
   return p;
 }
 
-// The reply playing right now, so starting another one stops it
+// One reply plays at a time. `speaking` is its text, so every speaker button (and auto-read)
+// can tell which one is playing; `current` stops it
+let speaking: string | null = null;
 let current: (() => void) | null = null;
+const listeners = new Set<() => void>();
+
+export function subscribeSpeaking(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export const getSpeaking = () => speaking;
+
+export const stopSpeaking = () => current?.();
+
+function setSpeaking(text: string | null) {
+  speaking = text;
+  listeners.forEach((l) => l());
+}
 
 // Read a reply aloud one sentence at a time, fetching sentence n+1 while n plays.
-// onEnd runs once, when it finishes, fails or is stopped. Returns stop()
-export function speak(markdown: string, onEnd: () => void): () => void {
+// Stops whatever was playing before; ends on its own when done or on a failed request
+export function speak(markdown: string) {
   current?.();
   const parts = sentences(speechText(markdown));
   const controller = new AbortController();
@@ -133,10 +152,13 @@ export function speak(markdown: string, onEnd: () => void): () => void {
     stopped = true;
     controller.abort();
     audio.pause();
-    if (current === stop) current = null;
-    onEnd();
+    if (current === stop) {
+      current = null;
+      setSpeaking(null);
+    }
   }
   current = stop;
+  setSpeaking(markdown);
 
   (async () => {
     let next = parts.length ? fetchSpeech(parts[0], controller.signal) : null;
@@ -153,5 +175,4 @@ export function speak(markdown: string, onEnd: () => void): () => void {
   })()
     .catch(() => {})
     .finally(stop);
-  return stop;
 }
