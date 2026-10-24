@@ -4,6 +4,7 @@ from typing import Literal
 from config import settings
 from db import get_document, get_thread, touch_thread
 from fastapi import APIRouter, HTTPException, Request
+from images import image_path
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 from pydantic import BaseModel
@@ -14,6 +15,11 @@ from tracing import tracer
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
+class ImageRef(BaseModel):
+    image_id: str
+    name: str
+
+
 class ChatRequest(BaseModel):
     message: str
     model: str | None = None
@@ -21,6 +27,7 @@ class ChatRequest(BaseModel):
     enabled_tools: list[str] | None = None
     think: bool = False
     attachments: list[str] | None = None  # doc_ids from the library, added to the thread
+    images: list[ImageRef] | None = None  # from POST /images, belong to this message only
 
 
 class ResumeRequest(BaseModel):
@@ -38,15 +45,25 @@ def ready_attachments(doc_ids: list[str]) -> list[dict]:
     return attachments
 
 
-async def stream_chat(graph, req: ChatRequest, attachments: list[dict]):
+def stored_images(images: list[ImageRef]) -> list[dict]:
+    for image in images:
+        if not image_path(image.image_id):
+            raise HTTPException(400, f"image {image.image_id} not found")
+    return [image.model_dump() for image in images]
+
+
+async def stream_chat(graph, req: ChatRequest, attachments: list[dict], images: list[dict]):
     thread_id = req.thread_id or str(uuid.uuid4())
     is_new = get_thread(thread_id) is None
     touch_thread(thread_id, req.message[:60])  # placeholder title until make_title's
     with tracer.start_as_current_span("chat", openinference_span_kind="chain") as span:
         span.set_input(req.message)
         input = {
-            # The turn's attachments ride on the message so history can show them per turn
-            "messages": [HumanMessage(req.message, additional_kwargs={"attachments": attachments})],
+            # The turn's attachments ride on the message so history can show them per turn.
+            # Images are only ids here; the agent node reads the files just before the model call
+            "messages": [
+                HumanMessage(req.message, additional_kwargs={"attachments": attachments, "images": images})
+            ],
             "attachments": attachments,
             "model": req.model or settings.default_model,
             "think": req.think,
@@ -70,7 +87,8 @@ async def stream_resume(graph, thread_id: str, action: str):
 async def chat(req: ChatRequest, request: Request):
     # Checked before streaming starts, so a bad id is a plain 400
     attachments = ready_attachments(req.attachments or [])
-    return EventSourceResponse(stream_chat(request.app.state.graph, req, attachments))
+    images = stored_images(req.images or [])
+    return EventSourceResponse(stream_chat(request.app.state.graph, req, attachments, images))
 
 
 @router.post("/{thread_id}/resume")

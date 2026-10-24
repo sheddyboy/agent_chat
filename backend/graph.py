@@ -3,13 +3,15 @@ from typing import Annotated, TypedDict
 
 from config import settings
 from guard import injection_score
-from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from images import image_block, image_path
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import Command, interrupt
+from models import capabilities
 from tools import ALL_TOOLS, SENSITIVE_TOOLS
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,30 @@ def attachment_note(attachments: list[dict]) -> SystemMessage:
     )
 
 
+def with_images(messages: list, vision: bool) -> list:
+    """Swap image ids on user messages for the images, or for placeholders if the model can't see.
+
+    Only the copies sent to the model change; the checkpoint keeps the ids.
+    """
+    out = []
+    for msg in messages:
+        images = msg.additional_kwargs.get("images") if isinstance(msg, HumanMessage) else None
+        if not images:
+            out.append(msg)
+            continue
+        blocks, missing = [], []
+        for image in images:
+            path = image_path(image["image_id"])
+            if vision and path:
+                blocks.append(image_block(path))
+            else:
+                missing.append(f"[image: {image['name']}]")
+        text = "\n".join([msg.text, *missing])
+        content = [{"type": "text", "text": text}, *blocks] if blocks else text
+        out.append(msg.model_copy(update={"content": content}))
+    return out
+
+
 def guard_input(state: ChatState) -> Command:
     text = state.get("messages", [])[-1].text
     score = injection_score(text)
@@ -59,15 +85,17 @@ def guard_input(state: ChatState) -> Command:
 def agent(state: ChatState) -> dict:
     # reasoning=True moves thinking out of the answer into reasoning_content;
     # the frontend only sends think for models with Ollama's thinking capability
+    model = state.get("model", settings.default_model)
     llm = ChatOllama(
-        model=state.get("model", settings.default_model),
+        model=model,
         base_url=settings.ollama_url,
+        num_ctx=settings.num_ctx,
         reasoning=state.get("think", False),
     )
     # No enabled_tools in state means the chat never chose, so all tools are on
     enabled = state.get("enabled_tools")
     tools = ALL_TOOLS if enabled is None else [t for t in ALL_TOOLS if t.name in enabled]
-    messages = state.get("messages", [])
+    messages = with_images(state.get("messages", []), "vision" in capabilities(model))
     attachments = state.get("attachments", [])
     if attachments:
         messages = [attachment_note(attachments), *messages]

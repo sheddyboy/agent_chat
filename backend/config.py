@@ -15,6 +15,8 @@ class Settings(BaseSettings):
         "llama3.1:8b",
         "qwen3-vl:8b",  # vision
     ]
+    # Ollama defaults to 4096, which all tool schemas plus an image already overflow
+    num_ctx: int = 8192
     phoenix_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project: str = "agent-chat"
     tavily_api_key: str = ""
