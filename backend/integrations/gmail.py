@@ -10,7 +10,7 @@ from guard import injection_score
 
 from integrations.google_auth import get_credentials
 
-SINCE_HELP = 'Use "24h", "48h", "7d", "2w", "1m", "3m", "1y", a range like "2026-10-01..2026-10-15", or "" for any time.'
+SINCE_HELP = 'Use "24h", "48h", "7d", "2w", "1m", "3m", "1y", a date like "2026-10-01" (that day to now), a range like "2026-10-01..2026-10-15", or "" for any time.'
 UNITS = {
     "h": timedelta(hours=1),
     "d": timedelta(days=1),
@@ -44,6 +44,8 @@ def parse_since(since: str) -> str:
         start = datetime.fromisoformat(m[1]).astimezone()
         end = datetime.fromisoformat(m[2]).astimezone() + timedelta(days=1)
         return f"after:{int(start.timestamp())} before:{int(end.timestamp())}"
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", since):
+        return f"after:{int(datetime.fromisoformat(since).astimezone().timestamp())}"
     raise ValueError(f'Unknown time range "{since}". {SINCE_HELP}')
 
 
