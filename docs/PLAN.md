@@ -172,7 +172,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **16b. Frontend.** `image` events render inline above the answer with `ImageThumb`, live and on reopened chats.
   Done when: approve two drawings in a row in one chat, both show inline and survive a refresh, and a rejected call shows no image.
 - [ ] **17. Gmail.** Read-only Gmail tools so the agent can pull, search and summarize my mail (I1 in `INTEGRATIONS.md`).
-  - [ ] **17a. Auth, search and read.** `integrations/google_auth.py` does a one-time browser login with the `gmail.readonly` scope and keeps the token in `secrets/`. `integrations/gmail.py` turns `since` (`24h`, `7d`, `1m`, `2026-10-01..2026-10-15`) into Gmail `after:`/`before:`, searches with metadata batches and cleans bodies. Snippets, subjects and bodies go through the injection guard. `tools/gmail.py` adds `search_emails` and `read_email`, registered only when the token exists.
+  - [x] **17a. Auth, search and read.** `integrations/google_auth.py` does a one-time browser login with the `gmail.readonly` scope and keeps the token in `secrets/`. `integrations/gmail.py` turns `since` (`24h`, `7d`, `1m`, `2026-10-01..2026-10-15`) into Gmail `after:`/`before:`, searches with metadata batches and cleans bodies. Snippets, subjects and bodies go through the injection guard. `tools/gmail.py` adds `search_emails` and `read_email`, registered only when the token exists.
   - [ ] **17b. Insights.** `email_insights(since, query, focus)`: exact stats in Python over the whole range, promotions and social skipped by default, map-reduce overview of the newest 150 with `qwen3:8b`.
   - [ ] **17c. UI and cache.** A Gmail connected status in the UI and a local cache so long ranges are fast.
   Done when: "unread from the last 24h", "emails from X this month" and "open the second one" work in chat, and the app starts fine without a token.
@@ -231,3 +231,7 @@ Deep research subgraph, long-term memory, conversation branching, artifacts pane
 - Tool toggles live in graph state (`enabled_tools`), so they are per thread and resumes keep them. Missing means all tools; the agent binds only the enabled ones while `ToolNode` keeps all.
 - MCP tools carry their server name in `tool.metadata["server"]` so the UI can group them.
 - "View trace" links to Phoenix's `/redirects/traces/{trace_id}`, which finds the project itself. The Phoenix UI URL comes from `NEXT_PUBLIC_PHOENIX_URL`.
+- Gmail is our own tools on the Gmail API, not an MCP server, so we control what reaches an 8K context. Read-only scope; the token lives in `backend/secrets/` and the tools only register when it exists.
+- The Gmail API client is built per call: its HTTP layer is not thread-safe and tool calls run in parallel.
+- Email text goes through the injection guard, subject and snippet checked separately. Invisible preview padding (U+034F, zero-width characters) and long tracking URLs both pushed normal marketing mail over 0.9, so they are stripped first (links become `[link: domain]`). That took false positives on two days of real mail from 7 of 36 to 1 (a login code, which is fine to hide).
+- `resultSizeEstimate` is too rough to show (201 for unrelated queries), so search only says whether Gmail has another page.
