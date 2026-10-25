@@ -35,8 +35,9 @@ def parse_since(since: str) -> str:
     since = since.strip().lower()
     if not since:
         return ""
-    if m := re.fullmatch(r"(\d+)\s*([hdwmy])", since):
-        start = datetime.now().astimezone() - int(m[1]) * UNITS[m[2]]
+    # Models also write "1mo", "2 weeks" or "3days"; the first letter picks the unit
+    if m := re.fullmatch(r"(\d+)\s*(h|hours?|d|days?|w|weeks?|m|mo|months?|y|years?)", since):
+        start = datetime.now().astimezone() - int(m[1]) * UNITS[m[2][0]]
         return f"after:{int(start.timestamp())}"
     if m := re.fullmatch(r"(\d{4}-\d{2}-\d{2})\s*\.\.\s*(\d{4}-\d{2}-\d{2})", since):
         # Naive dates are local midnight; the end day is included
@@ -130,6 +131,8 @@ def html_to_text(markup: str) -> str:
 def clean_body(text: str) -> str:
     """Cut quoted replies and signatures, squeeze whitespace, cap the length."""
     text = INVISIBLE.sub("", text.replace("\r\n", "\n"))
+    # Tracking links are long noise to the model and trip the guard; the domain is enough
+    text = re.sub(r"https?://(?:www\.)?([^/\s?#>]+)[^\s>)\]]*", r"[link: \1]", text)
     for marker in (r"\nOn [^\n]{0,200}?(\n[^\n]{0,200})?wrote:", r"\n-{2,} ?Original Message", r"\n-- \n"):
         if m := re.search(marker, text):
             text = text[: m.start()]
