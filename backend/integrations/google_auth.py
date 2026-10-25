@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from config import settings
@@ -5,17 +6,30 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/calendar.readonly",
+]
 
 
 def get_credentials() -> Credentials:
     """Load the saved token, refreshing it when it has expired."""
     token = Path(settings.google_token)
-    creds = Credentials.from_authorized_user_file(token, SCOPES)
+    # The scopes saved in the token, so a token from before a new scope still refreshes
+    creds = Credentials.from_authorized_user_file(token)
     if not creds.valid and creds.refresh_token:
         creds.refresh(Request())
         token.write_text(creds.to_json())
     return creds
+
+
+def has_scope(scope: str) -> bool:
+    """Whether the saved token was granted this scope, like "calendar.readonly"."""
+    token = Path(settings.google_token)
+    if not token.exists():
+        return False
+    scopes = json.loads(token.read_text()).get("scopes", [])
+    return f"https://www.googleapis.com/auth/{scope}" in scopes
 
 
 def login() -> None:
