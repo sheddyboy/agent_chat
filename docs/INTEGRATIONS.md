@@ -15,18 +15,9 @@ Rules for every integration:
 |---|---|---|---|---|
 | I1 | Gmail (done, slice 17) | Own tools, Gmail API | Model local, mail via Google | Medium |
 | I2 | Google Calendar | Own tools, reuses I1 auth | Model local, data via Google | Small |
-| I3 | Google Drive / Docs | Own tools into Qdrant ingestion | Model local, data via Google | Medium |
 | I4 | Memory / profile | Own tools plus SQLite | Yes | Small |
 | I5 | Daily briefing | Scheduled run over I1, I2 and weather | Yes | Small |
-| I6 | Obsidian / markdown notes | Existing ingestion plus filesystem MCP | Yes | Small |
 | I7 | GitHub | Official MCP server | No | Small |
-| I8 | Todoist / Apple Reminders | MCP or AppleScript | Mixed | Small |
-| I9 | Spotify | Own tools, Web API | No | Medium |
-| I10 | Home Assistant | Its MCP support | Yes | Small |
-| I11 | Telegram bot | Bot that forwards to `/chat` | No | Medium |
-| I12 | Slack / Discord | MCP servers | No | Small |
-| I13 | Apple Health / Strava | Parse export files | Yes for Health | Medium |
-| I14 | Bank CSV imports | Parse CSVs into SQLite | Yes | Small |
 
 ## Todos
 
@@ -52,8 +43,6 @@ Rules for every integration:
 - [ ] **I2. Google Calendar.** "What does my day look like", free slots, meeting prep that pulls related emails from I1.
   - Same OAuth client as I1, adds the `calendar.readonly` scope. This is the second use that justifies sharing `google_auth.py`.
 
-- [ ] **I3. Google Drive / Docs.** Pick files or a folder and ingest them into the Qdrant library like uploads.
-
 - [ ] **I4. Memory / profile.** The agent saves facts about me (preferences, people, ongoing things) and gets them in every thread.
   - `remember(fact)` and `forget(fact)` tools, a SQLite table, top facts added to the system prompt.
   - Biggest personalization win for the effort. Integrations give data, memory makes it mine.
@@ -61,20 +50,4 @@ Rules for every integration:
 - [ ] **I5. Daily briefing.** A morning digest: mail from the last 24h, today's calendar, weather, open GitHub reviews.
   - Depends on I1 and I2. Runs on a schedule and saves the result as a thread.
 
-- [ ] **I6. Obsidian / markdown notes.** Point ingestion at a notes folder and re-ingest on change.
-
 - [ ] **I7. GitHub.** My PRs, issues and review requests through the official GitHub MCP server. Needs a token, opt in.
-
-- [ ] **I8. Todoist / Apple Reminders.** "Add this to my list", "what's overdue". Todoist has an official MCP server, Reminders works through AppleScript on macOS.
-
-- [ ] **I9. Spotify.** What I've been listening to, playback control, playlists for a mood.
-
-- [ ] **I10. Home Assistant.** Lights and devices from chat. Local-first, fits the stack.
-
-- [ ] **I11. Telegram bot.** Talk to the agent from my phone. Pairs with voice mode for voice notes.
-
-- [ ] **I12. Slack / Discord.** Summaries of unread channels.
-
-- [ ] **I13. Apple Health / Strava.** Sleep, steps and workout trends. Apple Health is a local XML export.
-
-- [ ] **I14. Bank CSV imports.** Spending insights from exported statements, no live bank connection.
