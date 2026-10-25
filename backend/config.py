@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     # OAuth client from Google Cloud (Desktop app) and the token the login saves
     google_credentials: str = "secrets/credentials.json"
     google_token: str = "secrets/token.json"
+    # Calendar free_slots only looks inside these hours, local time
+    work_day_start: str = "09:00"
+    work_day_end: str = "18:00"
+    # The briefing's weather (Open-Meteo, no key); left unset, it skips the weather
+    weather_lat: float | None = None
+    weather_lon: float | None = None
 
 
 settings = Settings()

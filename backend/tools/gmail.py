@@ -13,7 +13,8 @@ def search_emails(
     """Search the user's Gmail. Use for any question about their email or inbox.
 
     since: how far back to look, like "24h", "48h", "7d", "2w", "1m", "3m", "1y",
-    a date range like "2026-10-01..2026-10-15", or "" for any time.
+    a date like "2026-10-01" (that day to now), a range like "2026-10-01..2026-10-15",
+    or "" for any time.
     query: free text or Gmail search syntax, like "invoice", "from:amazon",
     "has:attachment", "category:primary", "-category:promotions". Empty means all mail.
     unread_only: only unread mail.

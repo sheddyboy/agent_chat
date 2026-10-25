@@ -14,9 +14,9 @@ Rules for every integration:
 | # | Integration | How | Local? | Effort |
 |---|---|---|---|---|
 | I1 | Gmail (done, slice 17) | Own tools, Gmail API | Model local, mail via Google | Medium |
-| I2 | Google Calendar | Own tools, reuses I1 auth | Model local, data via Google | Small |
+| I2 | Google Calendar (done, slice 18a) | Own tools, reuses I1 auth | Model local, data via Google | Small |
 | I4 | Memory / profile | Own tools plus SQLite | Yes | Small |
-| I5 | Daily briefing | Scheduled run over I1, I2 and weather | Yes | Small |
+| I5 | Daily briefing (on demand done, slice 18b) | One pipeline over I1, I2 and weather | Yes | Small |
 | I7 | GitHub | Official MCP server | No | Small |
 
 ## Todos
@@ -40,14 +40,37 @@ Rules for every integration:
   - Files: `integrations/google_auth.py`, `integrations/gmail.py`, `tools/gmail.py`.
   - **Skipped:** an `email_insights` tool (stats plus map-reduce summaries over long ranges) and a UI connect status with a local cache. Recent overviews already work through `search_emails`, and searches are fast without a cache. Revisit if month-long overviews turn out to matter.
 
-- [ ] **I2. Google Calendar.** "What does my day look like", free slots, meeting prep that pulls related emails from I1.
-  - Same OAuth client as I1, adds the `calendar.readonly` scope. This is the second use that justifies sharing `google_auth.py`.
+- [x] **I2. Google Calendar (slice 18a).** Read-only. "What does my day look like", free slots, and meeting prep that pulls related emails from I1.
+  - **What it does**
+    - `list_events(when)`: events from all my calendars (including shared and holiday ones), one line each: day, time or "all day", title, calendar, location, meet link, up to 3 attendees plus a count, and "(declined)". `when` accepts `today`, `tomorrow`, `this week` (to Sunday), `next week`, a weekday like `friday` (the next one after today), `3d` or `2w` from now, a date, or a range like `2026-10-27..2026-10-29` (end day included).
+    - `free_slots(when, min_minutes)`: gaps inside working hours (`work_day_start` and `work_day_end` in `config.py`, 09:00 to 18:00) between timed events on every calendar. Computed in Python, not by the model.
+    - Meeting prep is the model chaining `list_events`, `search_emails` (a month of all mail) and `read_email`. No separate tool.
+    - Titles and locations go through the injection guard.
+  - **Limitations**
+    - At most 60 events per call, so a busy month gets cut; ask for a shorter range.
+    - All-day events never block time in `free_slots`, even when marked busy (they are mostly reminders and birthdays). Weekends get working hours like weekdays.
+    - Events on a shared calendar block my time too, so a partner's appointment shows me as busy.
+    - No event descriptions, only the fields above. Read-only: no creating, accepting or moving events.
+  - **Setup:** turn on the Google Calendar API in the same Cloud project as I1, then run the login again (`uv run python -m integrations.google_auth` from `backend/`). The token keeps the scopes it was saved with, so an old Gmail-only token still works for Gmail; the calendar tools only appear once the token has `calendar.readonly`.
+  - Files: `integrations/google_calendar.py`, `tools/google_calendar.py`.
 
 - [ ] **I4. Memory / profile.** The agent saves facts about me (preferences, people, ongoing things) and gets them in every thread.
   - `remember(fact)` and `forget(fact)` tools, a SQLite table, top facts added to the system prompt.
   - Biggest personalization win for the effort. Integrations give data, memory makes it mine.
 
-- [ ] **I5. Daily briefing.** A morning digest: mail from the last 24h, today's calendar, weather, open GitHub reviews.
-  - Depends on I1 and I2. Runs on a schedule and saves the result as a thread.
+- [ ] **I5. Daily briefing (on demand done in slice 18b, schedule still to do).** A morning digest of today's calendar, the last 24h of mail and the weather, saved as a chat.
+  - **What it does**
+    - The Briefing button in the sidebar calls `POST /briefing`, which opens a new chat titled "Briefing, Sun 25 Oct" in about 15 s.
+    - `briefing.py` is a pipeline, not an agent: it fetches the data directly, then makes one model call with fixed sections (Today, Mail worth a look, Weather). Overlapping events are found in code and marked as clashes, since the model missed them.
+    - Mail is the last 24h without promotions and social, at most 30, snippets cut to 80 characters, to fit the 8K context. Weather is today's sky, low and high, and rain chance from Open-Meteo (no key).
+    - The gathered data is saved in the chat as a `daily_briefing` tool step with email ids, so follow-ups like "tell me more about the Fathom recap" open the right email with `read_email`.
+    - A part that is not connected or fails becomes a short note; the rest of the briefing still renders.
+  - **Limitations**
+    - The model picks "mail worth a look" and sometimes keeps notifications (Slack, Otter.ai) or leaves out why an email matters.
+    - Only today's events, so a 04:30 start tomorrow is not mentioned in an evening briefing.
+    - No GitHub reviews until I7 exists.
+  - **Setup:** set `WEATHER_LAT` and `WEATHER_LON` in `backend/.env` for the weather; without them the briefing skips it.
+  - Files: `briefing.py`, `routes/briefing.py`, the button in `components/sidebar.tsx`.
+  - **Next (18c):** run it on a schedule from the backend at a set time, skip if today's briefing exists, and open it on first load.
 
 - [ ] **I7. GitHub.** My PRs, issues and review requests through the official GitHub MCP server. Needs a token, opt in.
