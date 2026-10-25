@@ -178,7 +178,7 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: "unread from the last 24h", "emails from X this month" and "open the second one" work in chat, and the app starts fine without a token.
 
 - [ ] **18. Calendar and briefing.** Read-only Google Calendar tools and an on-demand morning briefing (I2 and I5 in `INTEGRATIONS.md`).
-  - [ ] **18a. Calendar.** `google_auth.py` adds the `calendar.readonly` scope and loads the token with the scopes it was saved with, so a Gmail-only token keeps working. `integrations/google_calendar.py` reads all my calendars: `parse_when` (`today`, `tomorrow`, `this week`, `next week`, `7d`, a date or a range), events from one batch request, free slots from Google's freebusy within working hours. Titles and locations go through the guard. `tools/google_calendar.py` adds `list_events` and `free_slots`, registered only when the token has the calendar scope.
+  - [x] **18a. Calendar.** `google_auth.py` adds the `calendar.readonly` scope and loads the token with the scopes it was saved with, so a Gmail-only token keeps working. `integrations/google_calendar.py` reads all my calendars: `parse_when` (`today`, `tomorrow`, `this week`, `next week`, a weekday, `3d`, a date or a range), events from one batch request, free slots between timed events within working hours. `search_emails` also accepts a single date as `since`. Titles and locations go through the guard. `tools/google_calendar.py` adds `list_events` and `free_slots`, registered only when the token has the calendar scope.
   - [ ] **18b. Briefing on demand.** `briefing.py` gathers the last 24h of mail (no promotions or social), today's events and the weather (Open-Meteo), writes the digest with one model call and saves it as a thread, so follow-ups work. `POST /briefing` and a Briefing button in the sidebar.
   - [ ] **18c. Scheduled briefing (later).** Run the briefing at a set time from the backend, skip if today's exists. GitHub reviews join it once I7 exists.
   Done when: "what's on my calendar this week", "when am I free tomorrow for an hour" and "prep me for my next meeting" work in chat, and the Briefing button opens a new chat with today's digest.
@@ -203,6 +203,7 @@ Deep research subgraph, long-term memory, conversation branching, artifacts pane
 - Replies are spoken by fetching one sentence at a time from a plain `POST /voice/speak`, prefetching the next while one plays. Fast enough (about 0.2 s per sentence warm) that no streaming audio endpoint is needed.
 - Voice calls are not traced; Phoenix stays focused on LLM spans.
 - SQLite checkpointer for local-first simplicity.
+- Calendar free slots come from the events, not Google's freebusy: freebusy counts all-day events marked busy and blocked whole days.
 - One SQLite file (`app.db`) holds LangGraph's checkpoints and our own tables; our code uses stdlib `sqlite3` with a short-lived connection per call.
 - The checkpointer is the source of truth for messages. The `threads` table is only an index for the sidebar; `GET /threads/{id}` rebuilds the UI messages and events from the checkpoint (no `ms` or `trace_id`, those are not stored).
 - Titles come from the first user message only (like Claude), so they also work when the first turn stops at an approval. The frontend treats `title` like `done` when checking for a pending interrupt.

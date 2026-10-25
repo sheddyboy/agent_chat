@@ -14,7 +14,7 @@ Rules for every integration:
 | # | Integration | How | Local? | Effort |
 |---|---|---|---|---|
 | I1 | Gmail (done, slice 17) | Own tools, Gmail API | Model local, mail via Google | Medium |
-| I2 | Google Calendar | Own tools, reuses I1 auth | Model local, data via Google | Small |
+| I2 | Google Calendar (done, slice 18a) | Own tools, reuses I1 auth | Model local, data via Google | Small |
 | I4 | Memory / profile | Own tools plus SQLite | Yes | Small |
 | I5 | Daily briefing | Scheduled run over I1, I2 and weather | Yes | Small |
 | I7 | GitHub | Official MCP server | No | Small |
@@ -40,8 +40,19 @@ Rules for every integration:
   - Files: `integrations/google_auth.py`, `integrations/gmail.py`, `tools/gmail.py`.
   - **Skipped:** an `email_insights` tool (stats plus map-reduce summaries over long ranges) and a UI connect status with a local cache. Recent overviews already work through `search_emails`, and searches are fast without a cache. Revisit if month-long overviews turn out to matter.
 
-- [ ] **I2. Google Calendar.** "What does my day look like", free slots, meeting prep that pulls related emails from I1.
-  - Same OAuth client as I1, adds the `calendar.readonly` scope. This is the second use that justifies sharing `google_auth.py`.
+- [x] **I2. Google Calendar (slice 18a).** Read-only. "What does my day look like", free slots, and meeting prep that pulls related emails from I1.
+  - **What it does**
+    - `list_events(when)`: events from all my calendars (including shared and holiday ones), one line each: day, time or "all day", title, calendar, location, meet link, up to 3 attendees plus a count, and "(declined)". `when` accepts `today`, `tomorrow`, `this week` (to Sunday), `next week`, a weekday like `friday` (the next one after today), `3d` or `2w` from now, a date, or a range like `2026-10-27..2026-10-29` (end day included).
+    - `free_slots(when, min_minutes)`: gaps inside working hours (`work_day_start` and `work_day_end` in `config.py`, 09:00 to 18:00) between timed events on every calendar. Computed in Python, not by the model.
+    - Meeting prep is the model chaining `list_events`, `search_emails` (a month of all mail) and `read_email`. No separate tool.
+    - Titles and locations go through the injection guard.
+  - **Limitations**
+    - At most 60 events per call, so a busy month gets cut; ask for a shorter range.
+    - All-day events never block time in `free_slots`, even when marked busy (they are mostly reminders and birthdays). Weekends get working hours like weekdays.
+    - Events on a shared calendar block my time too, so a partner's appointment shows me as busy.
+    - No event descriptions, only the fields above. Read-only: no creating, accepting or moving events.
+  - **Setup:** turn on the Google Calendar API in the same Cloud project as I1, then run the login again (`uv run python -m integrations.google_auth` from `backend/`). The token keeps the scopes it was saved with, so an old Gmail-only token still works for Gmail; the calendar tools only appear once the token has `calendar.readonly`.
+  - Files: `integrations/google_calendar.py`, `tools/google_calendar.py`.
 
 - [ ] **I4. Memory / profile.** The agent saves facts about me (preferences, people, ongoing things) and gets them in every thread.
   - `remember(fact)` and `forget(fact)` tools, a SQLite table, top facts added to the system prompt.
