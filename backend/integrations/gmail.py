@@ -77,8 +77,8 @@ def to_row(msg: dict) -> dict:
 
 def search(since: str, query: str, unread_only: bool, max_results: int) -> tuple[list[dict], int]:
     """Matching mails, newest first, plus Gmail's estimate of the total."""
+    q = build_query(since, query, unread_only)  # first, so a bad range fails before any API call
     gmail = service()
-    q = build_query(since, query, unread_only)
     resp = gmail.users().messages().list(
         userId="me", q=q, maxResults=min(max_results, MAX_RESULTS)
     ).execute()

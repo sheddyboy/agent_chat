@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from config import settings
 
 from tools.calculator import calculator
@@ -24,3 +26,9 @@ if settings.tavily_api_key:
     from tools.web_search import web_search
 
     ALL_TOOLS.append(web_search)
+
+# Gmail needs the one-time login (integrations/google_auth.py) to have saved a token
+if Path(settings.google_token).exists():
+    from tools.gmail import read_email, search_emails
+
+    ALL_TOOLS += [search_emails, read_email]
