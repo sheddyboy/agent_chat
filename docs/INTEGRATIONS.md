@@ -13,7 +13,7 @@ Rules for every integration:
 
 | # | Integration | How | Local? | Effort |
 |---|---|---|---|---|
-| I1 | Gmail | Own tools, Gmail API | Model local, mail via Google | Medium |
+| I1 | Gmail (done, slice 17) | Own tools, Gmail API | Model local, mail via Google | Medium |
 | I2 | Google Calendar | Own tools, reuses I1 auth | Model local, data via Google | Small |
 | I3 | Google Drive / Docs | Own tools into Qdrant ingestion | Model local, data via Google | Medium |
 | I4 | Memory / profile | Own tools plus SQLite | Yes | Small |
@@ -30,15 +30,24 @@ Rules for every integration:
 
 ## Todos
 
-- [ ] **I1. Gmail.** Pull mail from any time range, search it, list unread, get summaries and insights.
-  - `search_emails(since, query, unread_only, max_results)`: one tool for date ranges, search and unread. `since` accepts `24h`, `48h`, `7d`, `1m`, `3m` or `2026-10-01..2026-10-15`, turned into Gmail `after:` / `before:` epoch seconds. `query` is free text or Gmail syntax (`from:bank`, `has:attachment`). Returns id, date, sender, subject and snippet per mail.
-  - `read_email(id)`: one cleaned body. HTML stripped, quoted replies and signatures cut, length capped.
-  - `email_insights(since, query, focus)`: stats in Python (counts, top senders, unread, categories, busiest days), then map-reduce with `llm.invoke` over batches of about 20 mails. `focus` is `summary`, `needs_reply`, `action_items`, `receipts`, `important` or free text.
+- [x] **I1. Gmail (slice 17).** Read-only. The agent searches my mail by time range, sender or topic, lists unread, opens single emails and summarizes recent mail.
+  - **What it does**
+    - `search_emails(since, query, unread_only, max_results)`: one tool for time ranges, search and unread. `since` accepts `24h`, `48h`, `7d`, `2w`, `1m`, `3m`, `1y` (also spelled out, like `1mo` or `2 weeks`), a range like `2026-10-01..2026-10-15` (end day included), or `""` for any time. `query` is free text or Gmail syntax (`from:bank`, `has:attachment`, `-category:promotions`). Returns one line per mail: id, date, sender, subject, unread flag, snippet, and whether more match.
+    - `read_email(message_id)`: one email with headers, a Gmail link that opens in a new tab, and a cleaned body (HTML to text, quoted replies and signatures cut, links shortened to `[link: domain]`, capped at 4000 characters).
+    - Overviews ("what happened in my email in the last 48h") come from the model summarizing a `search_emails` result. No separate insights tool.
+    - Subjects, snippets and bodies go through the injection guard; flagged ones are replaced with a short notice.
+  - **Limitations**
+    - One search returns at most 50 mails, newest first. About two days of my mail fits, so overviews of 24h or 48h see everything. A week or a month only sees the newest 50, and the model may summarize those as if they were the whole range. Narrow the query (a sender, `-category:promotions`) for longer ranges.
+    - No exact stats (counts, top senders) over a range; the model only sees what one search returns.
+    - Read-only: no replying, drafting, labeling or deleting. I reply in Gmail.
+    - Links inside emails are only shown as their domain, so the model cannot give the real job or tracking URL. Open the email in Gmail for those.
+    - Guard false positives: login-code emails get their snippet hidden. The input guard can also block my own message ("open my latest email ... and give me its Gmail link" scored 0.995); rewording works.
+    - Time ranges use 30-day months and 365-day years, and Gmail filters by the second it received the mail.
+    - Each turn takes the tool 0.3 to 2 s; the rest is the model.
+  - **Setup:** Google Cloud project, Gmail API on, OAuth client of type Desktop app, `credentials.json` into `backend/secrets/`, then `uv run python -m integrations.google_auth` from `backend/` once. Scope `gmail.readonly`. The tools only appear when `secrets/token.json` exists.
+  - **Gotcha:** an OAuth app in Testing mode expires refresh tokens after 7 days and the tools then ask me to log in again. Set the app to In production (unverified is fine for personal use).
   - Files: `integrations/google_auth.py`, `integrations/gmail.py`, `tools/gmail.py`.
-  - Setup: Google Cloud project, Gmail API on, OAuth client of type Desktop app, `credentials.json` into `backend/secrets/`, one browser login. Scope `gmail.readonly`.
-  - Gotcha: an OAuth app in Testing mode expires refresh tokens after 7 days. Set it to In production (unverified is fine for personal use).
-  - Slices: 17a auth plus search and read, 17b insights, 17c UI connect status and a local cache for long ranges.
-  - Later: `draft_reply` with the `gmail.compose` scope. Creates a draft, never sends, in `SENSITIVE_TOOLS`.
+  - **Skipped:** an `email_insights` tool (stats plus map-reduce summaries over long ranges) and a UI connect status with a local cache. Recent overviews already work through `search_emails`, and searches are fast without a cache. Revisit if month-long overviews turn out to matter.
 
 - [ ] **I2. Google Calendar.** "What does my day look like", free slots, meeting prep that pulls related emails from I1.
   - Same OAuth client as I1, adds the `calendar.readonly` scope. This is the second use that justifies sharing `google_auth.py`.
