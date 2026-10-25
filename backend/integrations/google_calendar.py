@@ -64,20 +64,25 @@ def clean(text: str) -> str:
 
 def to_row(ev: dict, calendar: str) -> dict:
     start, end = ev["start"], ev["end"]
-    if "date" in start:
+    all_day = "date" in start
+    if all_day:
         first = date.fromisoformat(start["date"])
         last = date.fromisoformat(end["date"]) - timedelta(days=1)  # Google's end date is exclusive
         when = "all day" if last == first else f"all day until {last:%a %Y-%m-%d}"
-        begins = midnight(first)
+        begins, ends = midnight(first), midnight(last + timedelta(days=1))
     else:
         begins = datetime.fromisoformat(start["dateTime"]).astimezone()
         ends = datetime.fromisoformat(end["dateTime"]).astimezone()
         when = f"{begins:%H:%M}-{ends:%H:%M}"
     people = ev.get("attendees", [])
     me = next((a for a in people if a.get("self")), {})
+    declined = me.get("responseStatus") == "declined"
     return {
         "id": ev["id"],
         "start": begins,
+        "end": ends,
+        # All-day events are mostly reminders and birthdays, so only timed ones block time
+        "busy": not all_day and ev.get("transparency") != "transparent" and not declined,
         "day": begins.strftime("%a %Y-%m-%d"),
         "time": when,
         "title": clean(ev.get("summary", "(no title)")),
@@ -85,13 +90,12 @@ def to_row(ev: dict, calendar: str) -> dict:
         "location": clean(ev["location"]) if ev.get("location") else "",
         "link": ev.get("hangoutLink", ""),
         "attendees": [a["email"] for a in people if not a.get("self") and "email" in a],
-        "declined": me.get("responseStatus") == "declined",
+        "declined": declined,
     }
 
 
-def list_events(when: str) -> tuple[list[dict], bool]:
-    """Events from all my calendars in the range, by start time, and whether more were cut."""
-    start, end = parse_when(when)  # first, so a bad range fails before any API call
+def events(start: datetime, end: datetime) -> list[dict]:
+    """Events from all my calendars in the range, by start time."""
     cal = service()
     cals = calendars(cal)
 
@@ -121,23 +125,20 @@ def list_events(when: str) -> tuple[list[dict], bool]:
             if ev.get("status") != "cancelled":
                 rows.append(to_row(ev, name))
     rows.sort(key=lambda r: r["start"])
+    return rows
+
+
+def list_events(when: str) -> tuple[list[dict], bool]:
+    """Events in the range, by start time, and whether more were cut."""
+    rows = events(*parse_when(when))  # parsed first, so a bad range fails before any API call
     return rows[:MAX_EVENTS], len(rows) > MAX_EVENTS
 
 
 def free_slots(when: str, min_minutes: int) -> list[tuple[datetime, datetime]]:
-    """Gaps of at least min_minutes inside working hours, from Google's free/busy."""
+    """Gaps of at least min_minutes inside working hours, between busy events on any calendar."""
+    # Not Google's freebusy: it counts all-day events marked busy, which blocked whole days
     start, end = parse_when(when)
-    cal = service()
-    # Only calendars I own or edit; a subscribed colleague's meetings don't make me busy
-    ids = [c["id"] for c in calendars(cal) if c.get("accessRole") in ("owner", "writer")]
-    resp = cal.freebusy().query(
-        body={"timeMin": start.isoformat(), "timeMax": end.isoformat(), "items": [{"id": i} for i in ids]}
-    ).execute()
-    busy = sorted(
-        (datetime.fromisoformat(b["start"]).astimezone(), datetime.fromisoformat(b["end"]).astimezone())
-        for c in resp.get("calendars", {}).values()
-        for b in c.get("busy", [])
-    )
+    busy = [(r["start"], r["end"]) for r in events(start, end) if r["busy"]]
 
     day_start = time.fromisoformat(settings.work_day_start)
     day_end = time.fromisoformat(settings.work_day_end)
