@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from config import settings
+from integrations.google_auth import has_scope
 
 from tools.calculator import calculator
 from tools.datetime_tool import get_datetime
@@ -32,3 +33,9 @@ if Path(settings.google_token).exists():
     from tools.gmail import read_email, search_emails
 
     ALL_TOOLS += [search_emails, read_email]
+
+# A token saved before the calendar scope was added keeps Gmail but gets no calendar tools
+if has_scope("calendar.readonly"):
+    from tools.google_calendar import free_slots, list_events
+
+    ALL_TOOLS += [list_events, free_slots]
