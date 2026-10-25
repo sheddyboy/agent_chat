@@ -16,7 +16,7 @@ Rules for every integration:
 | I1 | Gmail (done, slice 17) | Own tools, Gmail API | Model local, mail via Google | Medium |
 | I2 | Google Calendar (done, slice 18a) | Own tools, reuses I1 auth | Model local, data via Google | Small |
 | I4 | Memory / profile | Own tools plus SQLite | Yes | Small |
-| I5 | Daily briefing | Scheduled run over I1, I2 and weather | Yes | Small |
+| I5 | Daily briefing (on demand done, slice 18b) | One pipeline over I1, I2 and weather | Yes | Small |
 | I7 | GitHub | Official MCP server | No | Small |
 
 ## Todos
@@ -58,7 +58,19 @@ Rules for every integration:
   - `remember(fact)` and `forget(fact)` tools, a SQLite table, top facts added to the system prompt.
   - Biggest personalization win for the effort. Integrations give data, memory makes it mine.
 
-- [ ] **I5. Daily briefing.** A morning digest: mail from the last 24h, today's calendar, weather, open GitHub reviews.
-  - Depends on I1 and I2. Runs on a schedule and saves the result as a thread.
+- [ ] **I5. Daily briefing (on demand done in slice 18b, schedule still to do).** A morning digest of today's calendar, the last 24h of mail and the weather, saved as a chat.
+  - **What it does**
+    - The Briefing button in the sidebar calls `POST /briefing`, which opens a new chat titled "Briefing, Sun 25 Oct" in about 15 s.
+    - `briefing.py` is a pipeline, not an agent: it fetches the data directly, then makes one model call with fixed sections (Today, Mail worth a look, Weather). Overlapping events are found in code and marked as clashes, since the model missed them.
+    - Mail is the last 24h without promotions and social, at most 30, snippets cut to 80 characters, to fit the 8K context. Weather is today's sky, low and high, and rain chance from Open-Meteo (no key).
+    - The gathered data is saved in the chat as a `daily_briefing` tool step with email ids, so follow-ups like "tell me more about the Fathom recap" open the right email with `read_email`.
+    - A part that is not connected or fails becomes a short note; the rest of the briefing still renders.
+  - **Limitations**
+    - The model picks "mail worth a look" and sometimes keeps notifications (Slack, Otter.ai) or leaves out why an email matters.
+    - Only today's events, so a 04:30 start tomorrow is not mentioned in an evening briefing.
+    - No GitHub reviews until I7 exists.
+  - **Setup:** set `WEATHER_LAT` and `WEATHER_LON` in `backend/.env` for the weather; without them the briefing skips it.
+  - Files: `briefing.py`, `routes/briefing.py`, the button in `components/sidebar.tsx`.
+  - **Next (18c):** run it on a schedule from the backend at a set time, skip if today's briefing exists, and open it on first load.
 
 - [ ] **I7. GitHub.** My PRs, issues and review requests through the official GitHub MCP server. Needs a token, opt in.
