@@ -13,7 +13,8 @@ def list_events(when: str = "today") -> str:
 
     when: "today", "tomorrow", "this week", "next week", a weekday like "friday",
     a count like "3d" or "2w", a date like "2026-10-27", or a range like "2026-10-27..2026-10-29".
-    To prep for a meeting, call this first, then search_emails with the attendees or title words.
+    To prep for a meeting, call this first, then search_emails with since="1m",
+    unread_only=False and the title words or an attendee as the query.
     """
     try:
         rows, more = google_calendar.list_events(when)

@@ -39,8 +39,8 @@ def parse_when(when: str) -> tuple[datetime, datetime]:
     if when == "next week":
         return midnight(monday + timedelta(weeks=1)), midnight(monday + timedelta(weeks=2))
     if when in WEEKDAYS:
-        # The next one, or today if it is that day
-        day = today + timedelta(days=(WEEKDAYS.index(when) - today.weekday()) % 7)
+        # The next one after today; on a Sunday, "sunday" means next week's
+        day = today + timedelta(days=(WEEKDAYS.index(when) - today.weekday() - 1) % 7 + 1)
         return midnight(day), midnight(day + timedelta(days=1))
     # Models also write "next 3 days" or "2 weeks"
     if m := re.fullmatch(r"(?:next )?(\d+)\s*(d|days?|w|weeks?)", when):
