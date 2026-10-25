@@ -555,8 +555,13 @@ export function Chat() {
                               className="w-full max-w-sm"
                             />
                           ))}
+                        {/* Link safety off: links open straight in a new tab instead of a confirm dialog */}
                         {m.content && (
-                          <Streamdown plugins={plugins} isAnimating={streaming && i === messages.length - 1}>
+                          <Streamdown
+                            plugins={plugins}
+                            linkSafety={{ enabled: false }}
+                            isAnimating={streaming && i === messages.length - 1}
+                          >
                             {m.content}
                           </Streamdown>
                         )}

@@ -17,3 +17,4 @@ notes/
 *.db-*
 workspace/
 voice_models/
+secrets/

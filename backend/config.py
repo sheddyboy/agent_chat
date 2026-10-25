@@ -59,5 +59,9 @@ class Settings(BaseSettings):
     image_steps: int = 2  # 1 to 4 for Turbo; 2 took about 1 s on an M4 Pro
     image_unload_after_s: int = 300  # free the memory once drawing goes idle
 
+    # OAuth client from Google Cloud (Desktop app) and the token the login saves
+    google_credentials: str = "secrets/credentials.json"
+    google_token: str = "secrets/token.json"
+
 
 settings = Settings()
