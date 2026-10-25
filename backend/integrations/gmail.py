@@ -21,6 +21,8 @@ UNITS = {
 MAX_RESULTS = 50  # Gmail suggests batches of 50 or fewer
 MAX_BODY = 4000
 HIDDEN = "[hidden: this content looked like a prompt injection]"
+# Marketing mail pads previews with invisible characters, which the guard reads as an attack
+INVISIBLE = re.compile(r"[͏­​-‏⁠-⁤﻿]")
 
 
 def service():
@@ -60,11 +62,9 @@ def safe(text: str) -> str:
 def to_row(msg: dict) -> dict:
     headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
     sent = datetime.fromtimestamp(int(msg["internalDate"]) / 1000).astimezone()
-    subject = headers.get("Subject", "(no subject)")
-    snippet = html.unescape(msg.get("snippet", ""))
-    # One guard check per mail; a flagged mail hides both fields
-    if safe(f"{subject}\n{snippet}") == HIDDEN:
-        subject, snippet = HIDDEN, ""
+    # Checked separately so a flagged snippet (a login code, say) keeps its subject
+    subject = safe(" ".join(INVISIBLE.sub("", headers.get("Subject", "(no subject)")).split()))
+    snippet = safe(" ".join(INVISIBLE.sub("", html.unescape(msg.get("snippet", ""))).split()))
     return {
         "id": msg["id"],
         "date": sent.strftime("%Y-%m-%d %H:%M"),
@@ -75,8 +75,8 @@ def to_row(msg: dict) -> dict:
     }
 
 
-def search(since: str, query: str, unread_only: bool, max_results: int) -> tuple[list[dict], int]:
-    """Matching mails, newest first, plus Gmail's estimate of the total."""
+def search(since: str, query: str, unread_only: bool, max_results: int) -> tuple[list[dict], bool]:
+    """Matching mails, newest first, and whether more match than were returned."""
     q = build_query(since, query, unread_only)  # first, so a bad range fails before any API call
     gmail = service()
     resp = gmail.users().messages().list(
@@ -100,7 +100,8 @@ def search(since: str, query: str, unread_only: bool, max_results: int) -> tuple
         )
     batch.execute()
     rows = [to_row(msgs[i]) for i in ids if i in msgs]
-    return rows, resp.get("resultSizeEstimate", len(rows))
+    # resultSizeEstimate is too rough to show, but a next page means there is more
+    return rows, "nextPageToken" in resp
 
 
 def find_part(payload: dict, mime: str) -> str | None:
@@ -128,7 +129,7 @@ def html_to_text(markup: str) -> str:
 
 def clean_body(text: str) -> str:
     """Cut quoted replies and signatures, squeeze whitespace, cap the length."""
-    text = text.replace("\r\n", "\n")
+    text = INVISIBLE.sub("", text.replace("\r\n", "\n"))
     for marker in (r"\nOn [^\n]{0,200}?(\n[^\n]{0,200})?wrote:", r"\n-{2,} ?Original Message", r"\n-- \n"):
         if m := re.search(marker, text):
             text = text[: m.start()]

@@ -20,7 +20,7 @@ def search_emails(
     Returns one line per mail with its id; pass the id to read_email for the full text.
     """
     try:
-        rows, total = gmail.search(since, query, unread_only, max_results)
+        rows, more = gmail.search(since, query, unread_only, max_results)
     except ValueError as e:
         return str(e)
     except RefreshError:
@@ -34,7 +34,9 @@ def search_emails(
         f"{' (unread)' if r['unread'] else ''} | {r['snippet']}"
         for i, r in enumerate(rows, 1)
     ]
-    return "\n".join(lines) + f"\n\nShowing {len(rows)} of about {max(total, len(rows))}."
+    if more:
+        return "\n".join(lines) + f"\n\nShowing the newest {len(rows)}. More match; narrow the search or raise max_results."
+    return "\n".join(lines) + f"\n\nThat is all {len(rows)}."
 
 
 @tool
