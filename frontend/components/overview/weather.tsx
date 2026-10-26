@@ -44,24 +44,19 @@ function Sparkline({ temps }: { temps: number[] }) {
   const points = temps.map((t, i) => [(i / (temps.length - 1)) * w, h - ((t - lo) / (hi - lo)) * h]);
   const line = points.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-12 w-full overflow-visible text-foreground">
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      className="h-12 w-full overflow-visible text-foreground motion-safe:[animation:reveal_1.2s_ease-out_both]"
+    >
       <defs>
         <linearGradient id="weather-fill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="currentColor" stopOpacity="0.18" />
           <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={`${line} L${w},${h} L0,${h} Z`} fill="url(#weather-fill)" className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-1000" />
-      <path
-        d={line}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-        pathLength={1}
-        className="[stroke-dasharray:1] motion-safe:[animation:draw_1.2s_ease-out_both]"
-      />
+      <path d={`${line} L${w},${h} L0,${h} Z`} fill="url(#weather-fill)" />
+      <path d={line} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

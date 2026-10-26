@@ -92,7 +92,7 @@ export function Card({
 }) {
   return (
     <section
-      className={`group flex flex-col gap-4 rounded-2xl border bg-card p-5 transition duration-300 hover:border-foreground/20 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:fill-mode-both motion-safe:duration-500 motion-safe:hover:-translate-y-0.5 ${className}`}
+      className={`group flex min-w-0 flex-col gap-4 rounded-2xl border bg-card p-5 transition duration-300 hover:border-foreground/20 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:fill-mode-both motion-safe:duration-500 motion-safe:hover:-translate-y-0.5 ${className}`}
       style={{ animationDelay: `${index * 80}ms` }}
     >
       <header className="flex items-center gap-2">

@@ -21,7 +21,7 @@ type Schedule = { connected: false } | { connected: true; events: Event[]; free:
 // One row of the timeline: a timed event or a free gap, in start order
 type Row = { kind: "event"; event: Event; start: Date; end: Date } | { kind: "free"; start: Date; end: Date };
 
-const clock = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const clock = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 
 function minutes(a: Date, b: Date) {
   const m = Math.round((b.getTime() - a.getTime()) / 60000);

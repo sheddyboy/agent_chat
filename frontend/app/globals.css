@@ -136,13 +136,13 @@
     @apply font-sans;
   }
 }
-/* Overview: the weather line draws itself in, the weather icon drifts */
-@keyframes draw {
+/* Overview: the weather line wipes in from the left, the weather icon drifts */
+@keyframes reveal {
   from {
-    stroke-dashoffset: 1;
+    clip-path: inset(0 100% 0 0);
   }
   to {
-    stroke-dashoffset: 0;
+    clip-path: inset(0 0 0 0);
   }
 }
 

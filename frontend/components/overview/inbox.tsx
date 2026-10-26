@@ -11,7 +11,7 @@ type Inbox =
 function when(date: string) {
   const d = new Date(date.replace(" ", "T"));
   return d.toDateString() === new Date().toDateString()
-    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
     : d.toLocaleDateString([], { weekday: "short" });
 }
 
