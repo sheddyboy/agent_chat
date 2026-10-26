@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 import { InboxWidget } from "@/components/overview/inbox";
 import { RecentChatsWidget } from "@/components/overview/recent-chats";
+import { ResumeWidget } from "@/components/overview/resume";
 import { ScheduleWidget } from "@/components/overview/schedule";
 import { StatusWidget } from "@/components/overview/status";
 import { WeatherWidget } from "@/components/overview/weather";
@@ -52,8 +53,9 @@ export default function Overview() {
               <ScheduleWidget index={0} className="md:row-span-2 xl:col-span-2" />
               <WeatherWidget index={1} />
               <InboxWidget index={2} />
-              <RecentChatsWidget index={3} className="xl:col-span-2" />
+              <RecentChatsWidget index={3} className="md:row-span-2 xl:col-span-2" />
               <StatusWidget index={4} />
+              <ResumeWidget index={5} />
             </div>
           </div>
         </main>
