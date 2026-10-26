@@ -12,6 +12,7 @@ It is a working showcase of:
 - **Ask about images**: attach a screenshot or photo and ask a local vision model (qwen3-vl) about it
 - **Voice**: local speech to text (Parakeet) and text to speech (Kokoro) on onnxruntime
 - **Draw**: the agent can generate images with SDXL Turbo on the Mac's GPU, shown inline in the answer
+- **Overview**: a home page with today's schedule, inbox, weather, recent chats and system status; chat lives at `/c`
 - **Live event streaming** over SSE: tokens, reasoning, node and tool steps, retrieval hits, approvals
 - **Observability and evals** with Phoenix: every chat is a trace, every eval suite is an experiment
 
@@ -456,6 +457,7 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 | `POST` | `/chat/{thread_id}/resume` | `{"action": "approve" \| "reject"}` | SSE stream, or `409` with no pending approval |
 | `POST` | `/documents` | multipart `file` | SSE stream of `ingestion` events, then `done` |
 | `GET` | `/documents/{doc_id}` | | `{doc_id, chunks}` |
+| `GET` | `/overview/{schedule,inbox,weather,status}` | | One widget's data; `{connected: false}` when its source is not set up, `502` when it fails |
 | `GET` | `/models` | | `{models: [{name, thinking, vision}], default}` |
 | `POST` | `/images` | multipart `file` (png, jpeg, webp, up to 10 MB) | `{image_id, name}`, or `400` |
 | `GET` | `/images/{image_id}` | | the image, or `404` |

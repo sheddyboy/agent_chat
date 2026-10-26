@@ -183,6 +183,11 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [ ] **18c. Scheduled briefing (later).** Run the briefing at a set time from the backend, skip if today's exists. GitHub reviews join it once I7 exists.
   Done when: "what's on my calendar this week", "when am I free tomorrow for an hour" and "prep me for my next meeting" work in chat, and the Briefing button opens a new chat with today's digest.
 
+- [x] **19. Overview.** A home page of widgets to glance at, next to chat.
+  - [x] **19a. Widget data.** `overview.py` has one plain function per widget: today's events and free slots, the inbox unread count with recent unread mail, current weather with the next 8 hours (Open-Meteo), and system status (Ollama and its loaded model, Phoenix, library size, Google scopes). `routes/overview.py` serves each at `GET /overview/{widget}`, so each card loads and fails on its own.
+  - [x] **19b. Overview page.** `/` is the Overview and new chat moves to `/c`. `components/overview/` has a shared `Card` shell (staggered entrance, skeleton, error state, count-up numbers) and one file per widget: a timeline with free gaps and a live "now" line, inbox, weather with a drawn hourly line, recent chats and status dots. Theme tokens only, animations behind `motion-safe`.
+  Done when: `/` shows all five cards from real data in light and dark, at phone width, and `/c`, saved chats and "Ask about this" still work.
+
 ## Later ideas
 
 Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, `guard_output` node, rename and search chats, `@` mentions for documents, full-text context for small documents.
