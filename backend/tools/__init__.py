@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 from config import settings
@@ -15,6 +16,7 @@ ALL_TOOLS = [get_datetime, calculator, search_documents, save_note, generate_ima
 SENSITIVE_TOOLS = {
     "save_note",
     "generate_image",  # slow and memory hungry
+    "edit_resume",
     # Filesystem MCP tools that change files
     "write_file",
     "edit_file",
@@ -39,3 +41,9 @@ if has_scope("calendar.readonly"):
     from tools.google_calendar import free_slots, list_events
 
     ALL_TOOLS += [list_events, free_slots]
+
+# The resume compiles with Tectonic (brew install tectonic)
+if shutil.which("tectonic"):
+    from tools.resume import edit_resume, read_resume
+
+    ALL_TOOLS += [read_resume, edit_resume]
