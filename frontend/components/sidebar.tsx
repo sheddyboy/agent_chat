@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { FileText, Loader2, MessageSquare, PanelLeft, Plus, Sparkles, Sun, Trash2 } from "lucide-react";
+import { FileText, LayoutGrid, Loader2, MessageSquare, PanelLeft, Plus, Sparkles, Sun, Trash2 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -40,6 +40,8 @@ export function Sidebar({
   const sentinel = useRef<HTMLDivElement>(null);
   const loadingMore = useRef(false);
   const router = useRouter();
+  const pathname = usePathname();
+  const here = (path: string) => (pathname === path ? "bg-sidebar-accent text-foreground" : "");
   const label = collapsed ? "md:hidden" : "";
 
   function loadFirstPage() {
@@ -93,7 +95,7 @@ export function Sidebar({
     await fetch(`${API}/threads/${id}`, { method: "DELETE" });
     setThreads((prev) => prev.filter((t) => t.thread_id !== id));
     setConfirming(null);
-    if (id === currentId) router.push("/");
+    if (id === currentId) router.push("/c");
   }
 
   return (
@@ -119,7 +121,11 @@ export function Sidebar({
           </button>
         </div>
 
-        <Link href="/" onClick={onClose} className={`${item} ${disabled ? off : ""}`}>
+        <Link href="/" onClick={onClose} className={`${item} ${here("/")} ${disabled ? off : ""}`}>
+          <LayoutGrid className="size-4 shrink-0" />
+          <span className={label}>Overview</span>
+        </Link>
+        <Link href="/c" onClick={onClose} className={`${item} ${here("/c")} ${disabled ? off : ""}`}>
           <Plus className="size-4 shrink-0" />
           <span className={label}>New chat</span>
         </Link>
@@ -129,7 +135,7 @@ export function Sidebar({
             {briefing === "busy" ? "Preparing briefing..." : briefing === "failed" ? "Briefing failed, retry" : "Briefing"}
           </span>
         </button>
-        <Link href="/documents" className={item}>
+        <Link href="/documents" className={`${item} ${here("/documents")}`}>
           <FileText className="size-4 shrink-0" />
           <span className={label}>Documents</span>
         </Link>

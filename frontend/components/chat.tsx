@@ -105,10 +105,10 @@ export function Chat() {
   const bottom = useRef<HTMLDivElement>(null);
   const opening = useRef<string | null>(null);
 
-  // The URL decides what is open: "/" is a new chat, "/c/{id}" a saved one
+  // The URL decides what is open: "/c" is a new chat, "/c/{id}" a saved one
   const pathname = usePathname();
   const urlId = pathname.startsWith("/c/") ? pathname.slice(3) : null;
-  // "Ask about this" on the Documents page opens /?attach={doc_id}
+  // "Ask about this" on the Documents page opens /c?attach={doc_id}
   const attachId = useSearchParams().get("attach");
 
   useEffect(() => {
@@ -175,7 +175,7 @@ export function Chat() {
   useEffect(() => {
     if (!attachId || urlId) return;
     // Drop the param first so a refresh does not attach the file again
-    window.history.replaceState(null, "", "/");
+    window.history.replaceState(null, "", "/c");
     fetch(`${API}/documents/${attachId}`)
       .then((r) => (r.ok ? r.json() : null))
       // Add-only: dev mode runs this effect twice, and a toggle would undo itself
@@ -477,7 +477,7 @@ export function Chat() {
         ) : status === "missing" ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
             <p className="text-sm text-muted-foreground">This chat doesn&apos;t exist or was deleted.</p>
-            <Link href="/" className="text-sm underline underline-offset-4">
+            <Link href="/c" className="text-sm underline underline-offset-4">
               Start a new chat
             </Link>
           </div>
