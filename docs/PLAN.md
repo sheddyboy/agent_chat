@@ -188,6 +188,12 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **19b. Overview page.** `/` is the Overview and new chat moves to `/c`. `components/overview/` has a shared `Card` shell (staggered entrance, skeleton, error state, count-up numbers) and one file per widget: a timeline with free gaps and a live "now" line, inbox, weather with a drawn hourly line, recent chats and status dots. Theme tokens only, animations behind `motion-safe`.
   Done when: `/` shows all five cards from real data in light and dark, at phone width, and `/c`, saved chats and "Ask about this" still work.
 
+- [x] **20. Resume.** Keep my resume (Jake's Resume, LaTeX) in the app and update it by hand or from chat.
+  - [x] **20a. Storage and compile.** `resume.py` keeps `resume/resume.tex` (git ignored, starts from `resume_template.tex`) and compiles it with Tectonic in a temp folder. A source is saved only if it compiles, and the version it replaces goes to `resume/history/`. Overleaf's pdfTeX-only lines (`\input{glyphtounicode}`, `\pdfgentounicode=1`) are commented out for the compile only, so the source still pastes back into Overleaf. `GET/PUT /resume`, `GET /resume/pdf`, `GET /resume/history`, `POST /resume/restore`.
+  - [x] **20b. Resume page.** `/resume`: CodeMirror with LaTeX highlighting themed from the app's CSS variables, the PDF in the browser's viewer, Cmd+S to save and compile, the LaTeX error under the editor, history restore and PDF download. Code and Preview tabs on phones. Reloads on focus so chat edits show up. A Resume link in the sidebar and a Resume card on the Overview.
+  - [x] **20c. Chat tools.** `read_resume` and `edit_resume(find, replace)` (one exact match, recompiled, rolled back with the error if it breaks). `edit_resume` needs approval. Registered only when `tectonic` is on PATH.
+  Done when: the page edits and compiles, a broken edit leaves the last good PDF, history restores, and "change X on my resume" in chat shows an approval card and then the change.
+
 ## Later ideas
 
 Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, `guard_output` node, rename and search chats, `@` mentions for documents, full-text context for small documents.
