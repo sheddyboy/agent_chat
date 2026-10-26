@@ -69,5 +69,8 @@ class Settings(BaseSettings):
     weather_lat: float | None = None
     weather_lon: float | None = None
 
+    # resume.tex, its compiled PDF and earlier versions; personal, so git ignores it
+    resume_dir: str = "resume"
+
 
 settings = Settings()
