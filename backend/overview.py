@@ -15,6 +15,17 @@ INBOX_ROWS = 5
 HOURS = 8
 
 
+def event(r: dict) -> dict:
+    """A calendar row from google_calendar as JSON."""
+    keep = ("id", "time", "title", "calendar", "location", "link", "busy", "declined")
+    return {
+        **{k: r[k] for k in keep},
+        "start": r["start"].isoformat(),
+        "end": r["end"].isoformat(),
+        "all_day": r["time"].startswith("all day"),
+    }
+
+
 def schedule() -> dict:
     if not has_scope("calendar.readonly"):
         return {"connected": False}
@@ -22,13 +33,9 @@ def schedule() -> dict:
 
     rows, _ = google_calendar.list_events("today")
     slots = google_calendar.free_slots("today", 30)
-    keep = ("id", "time", "title", "calendar", "location", "link", "busy", "declined")
     return {
         "connected": True,
-        "events": [
-            {**{k: r[k] for k in keep}, "start": r["start"].isoformat(), "end": r["end"].isoformat(), "all_day": r["time"].startswith("all day")}
-            for r in rows
-        ],
+        "events": [event(r) for r in rows],
         "free": [{"start": s.isoformat(), "end": e.isoformat()} for s, e in slots],
     }
 
