@@ -13,6 +13,7 @@ It is a working showcase of:
 - **Voice**: local speech to text (Parakeet) and text to speech (Kokoro) on onnxruntime
 - **Draw**: the agent can generate images with SDXL Turbo on the Mac's GPU, shown inline in the answer
 - **Overview**: a home page with today's schedule, inbox, weather, recent chats and system status; chat lives at `/c`
+- **Resume**: an Overleaf-style LaTeX editor (Jake's Resume) with a live PDF preview, compiled locally with Tectonic; the agent can read and edit it behind an approval
 - **Live event streaming** over SSE: tokens, reasoning, node and tool steps, retrieval hits, approvals
 - **Observability and evals** with Phoenix: every chat is a trace, every eval suite is an experiment
 
@@ -110,6 +111,7 @@ flowchart LR
 - `npx` and `uvx` on your PATH (the MCP servers are launched with them)
 - [Ollama](https://ollama.com/) running locally
 - Optional: Tesseract, for OCR of scanned PDFs
+- Optional: [Tectonic](https://tectonic-typesetting.github.io) (`brew install tectonic`), for the resume page and tools
 - Optional: a [Tavily](https://tavily.com/) API key, for web search
 
 Pull the models:
@@ -457,6 +459,11 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 | `POST` | `/chat/{thread_id}/resume` | `{"action": "approve" \| "reject"}` | SSE stream, or `409` with no pending approval |
 | `POST` | `/documents` | multipart `file` | SSE stream of `ingestion` events, then `done` |
 | `GET` | `/documents/{doc_id}` | | `{doc_id, chunks}` |
+| `GET` | `/resume` | | `{tex, updated_at, has_pdf}`; the first call starts from the template |
+| `PUT` | `/resume` | `{tex}` | `{ok, log, tex, updated_at, has_pdf}`; saved only if it compiles, `log` holds the LaTeX error |
+| `GET` | `/resume/pdf` | | the compiled PDF, or `404` |
+| `GET` | `/resume/history` | | `[{name, saved_at}]`, newest first |
+| `POST` | `/resume/restore` | `{name}` | same as `PUT /resume` |
 | `GET` | `/overview/{schedule,inbox,weather,status}` | | One widget's data; `{connected: false}` when its source is not set up, `502` when it fails |
 | `GET` | `/models` | | `{models: [{name, thinking, vision}], default}` |
 | `POST` | `/images` | multipart `file` (png, jpeg, webp, up to 10 MB) | `{image_id, name}`, or `400` |
