@@ -31,7 +31,14 @@ const highlight = HighlightStyle.define([
   { tag: [tags.atom, tags.number, tags.string], color: "color-mix(in oklch, var(--foreground) 75%, transparent)" },
 ]);
 
-const extensions = [StreamLanguage.define(stex), syntaxHighlighting(highlight), EditorView.lineWrapping, theme];
+const extensions = [
+  StreamLanguage.define(stex),
+  syntaxHighlighting(highlight),
+  EditorView.lineWrapping,
+  // The browser's spellcheck underlines LaTeX commands and names
+  EditorView.contentAttributes.of({ spellcheck: "false" }),
+  theme,
+];
 
 export function Editor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
