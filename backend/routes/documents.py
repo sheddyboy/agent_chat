@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import jobs
+from jobs import runner
 from core.config import settings
 from core.db import get_document, list_documents
 from core.events import event
@@ -39,8 +39,8 @@ async def upload_document(file: UploadFile):
     path.write_bytes(data)
     # A job, so ingestion finishes even if the page closes; the same file twice joins one job
     doc_id = make_doc_id(data)
-    job_id = jobs.running("ingest", doc_id) or jobs.start("ingest", doc_id, stream_ingest(path, name))
-    return EventSourceResponse(jobs.follow(job_id))
+    job_id = runner.running("ingest", doc_id) or runner.start("ingest", doc_id, stream_ingest(path, name))
+    return EventSourceResponse(runner.follow(job_id))
 
 
 @router.get("")

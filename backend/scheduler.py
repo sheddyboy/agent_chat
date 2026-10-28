@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import datetime
 
-import jobs
+from jobs import runner
 from briefing import run, today_key
 from core.config import settings
 from core.db import get_briefing
@@ -23,9 +23,9 @@ async def loop(graph):
     while True:
         try:
             day = today_key()
-            if due(datetime.now()) and not get_briefing(day) and not jobs.running("briefing", day):
+            if due(datetime.now()) and not get_briefing(day) and not runner.running("briefing", day):
                 logger.info("scheduler: writing the briefing for %s", day)
-                jobs.start("briefing", day, run(graph))
+                runner.start("briefing", day, run(graph))
         except Exception:
             logger.exception("scheduler tick failed")
         await asyncio.sleep(TICK_S)

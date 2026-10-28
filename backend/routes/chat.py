@@ -1,7 +1,7 @@
 import uuid
 from typing import Literal
 
-import jobs
+from jobs import runner
 from core.config import settings
 from core.db import get_document, get_thread, touch_thread
 from fastapi import APIRouter, HTTPException, Request
@@ -105,6 +105,6 @@ async def resume(thread_id: str, req: ResumeRequest, request: Request):
 
 def start_turn(thread_id: str, events) -> EventSourceResponse:
     """Run the turn as a job, so the answer keeps going if the page closes, and follow it."""
-    if jobs.running("chat", thread_id):
+    if runner.running("chat", thread_id):
         raise HTTPException(409, "an answer is still being written in this chat")
-    return EventSourceResponse(jobs.follow(jobs.start("chat", thread_id, events)))
+    return EventSourceResponse(runner.follow(runner.start("chat", thread_id, events)))

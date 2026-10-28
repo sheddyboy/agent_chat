@@ -1,5 +1,5 @@
-import jobs
-from core.db import get_job, list_jobs
+from jobs import runner
+from jobs.store import get_job, list_jobs
 from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
@@ -17,12 +17,12 @@ def one(job_id: str):
     job = get_job(job_id)
     if not job:
         raise HTTPException(404, "no such job")
-    return {**job, "followable": jobs.live(job_id)}
+    return {**job, "followable": runner.live(job_id)}
 
 
 @router.get("/{job_id}/events")
 def events(job_id: str, after: int = 0):
     """Every event so far from `after`, then live ones until the job ends."""
-    if not jobs.live(job_id):
+    if not runner.live(job_id):
         raise HTTPException(404, "job finished too long ago or never ran here")
-    return EventSourceResponse(jobs.follow(job_id, after))
+    return EventSourceResponse(runner.follow(job_id, after))

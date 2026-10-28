@@ -1,6 +1,6 @@
 import re
 
-import jobs
+from jobs import runner
 from briefing import run, shown, today_key
 from core.db import get_briefing, list_briefings
 from fastapi import APIRouter, HTTPException, Request
@@ -14,8 +14,8 @@ router = APIRouter(prefix="/briefing", tags=["briefing"])
 async def briefing(request: Request):
     """Write today's briefing as a job and follow it; a second call joins the running one."""
     day = today_key()
-    job_id = jobs.running("briefing", day) or jobs.start("briefing", day, run(request.app.state.graph))
-    return EventSourceResponse(jobs.follow(job_id))
+    job_id = runner.running("briefing", day) or runner.start("briefing", day, run(request.app.state.graph))
+    return EventSourceResponse(runner.follow(job_id))
 
 
 @router.get("")
@@ -29,7 +29,7 @@ def one(day: str):
         day = today_key()
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
         raise HTTPException(400, "day is today or YYYY-MM-DD")
-    job_id = jobs.running("briefing", day)
+    job_id = runner.running("briefing", day)
     row = get_briefing(day)
     if row:
         # job_id is set while a regenerate is running

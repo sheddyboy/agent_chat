@@ -45,17 +45,6 @@ CREATE TABLE IF NOT EXISTS places (
     is_home    INTEGER NOT NULL DEFAULT 0,  -- the one the Overview, briefing and alerts use
     created_at TEXT NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS jobs (
-    id          TEXT PRIMARY KEY,
-    kind        TEXT NOT NULL,     -- chat | ingest | briefing
-    ref         TEXT NOT NULL,     -- the thread, document or day it works on
-    status      TEXT NOT NULL,     -- running | done | failed | interrupted
-    error       TEXT,
-    created_at  TEXT NOT NULL,
-    finished_at TEXT
-);
-CREATE INDEX IF NOT EXISTS jobs_ref ON jobs(kind, ref, created_at DESC);
 """
 
 
@@ -70,12 +59,11 @@ def now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
 
-def init_db():
+def init_db(*inits):
+    """Each area's init(conn) creates its tables and tidies up after a restart; main.py passes them in."""
     with closing(connect()) as conn, conn:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
-        # Jobs run inside this process, so none survive a restart
-        conn.execute("UPDATE jobs SET status = 'interrupted', finished_at = ? WHERE status = 'running'", (now(),))
         conn.execute(
             "UPDATE documents SET status = 'failed', error = 'Interrupted, upload it again' WHERE status = 'ingesting'"
         )
@@ -86,6 +74,8 @@ def init_db():
                 "INSERT INTO places (name, lat, lon, is_home, created_at) VALUES (?, ?, ?, 1, ?)",
                 (settings.weather_place, settings.weather_lat, settings.weather_lon, now()),
             )
+        for init in inits:
+            init(conn)
 
 
 def touch_thread(thread_id: str, title: str):
@@ -221,31 +211,3 @@ def set_home(place_id: int):
 def delete_place(place_id: int):
     with closing(connect()) as conn, conn:
         conn.execute("DELETE FROM places WHERE id = ? AND is_home = 0", (place_id,))
-
-
-def create_job(job_id: str, kind: str, ref: str):
-    with closing(connect()) as conn, conn:
-        conn.execute("INSERT INTO jobs (id, kind, ref, status, created_at) VALUES (?, ?, ?, 'running', ?)", (job_id, kind, ref, now()))
-
-
-def finish_job(job_id: str, status: str, error: str | None):
-    with closing(connect()) as conn, conn:
-        conn.execute("UPDATE jobs SET status = ?, error = ?, finished_at = ? WHERE id = ?", (status, error, now(), job_id))
-
-
-def list_jobs(kind: str | None, ref: str | None, status: str | None, limit: int = 20) -> list[dict]:
-    where, args = [], []
-    for column, value in (("kind", kind), ("ref", ref), ("status", status)):
-        if value:
-            where.append(f"{column} = ?")
-            args.append(value)
-    sql = "SELECT * FROM jobs" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY created_at DESC LIMIT ?"
-    with closing(connect()) as conn:
-        rows = conn.execute(sql, (*args, limit)).fetchall()
-    return [dict(r) for r in rows]
-
-
-def get_job(job_id: str) -> dict | None:
-    with closing(connect()) as conn:
-        row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-    return dict(row) if row else None

@@ -3,7 +3,7 @@
 A job runs one of the existing event generators (a chat turn, an ingestion, a briefing) in
 its own asyncio task and keeps every event it yields. Pages follow a job: they get the events
 so far, then live ones, and can leave and come back. Leaving only stops the watching.
-Jobs live in this process; a restart marks unfinished ones as interrupted (db.init_db).
+Jobs live in this process; a restart marks unfinished ones as interrupted (jobs/store.py).
 """
 
 import asyncio
@@ -13,7 +13,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 
-from core.db import create_job, finish_job
+from jobs.store import create_job, finish_job
 from core.events import event
 
 logger = logging.getLogger(__name__)
