@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, Brain, Check, ChevronRight, Clock, FileSearch, Hand, Loader2, ShieldX, TriangleAlert } from "lucide-react";
+import { Ban, Brain, Check, ChevronRight, Clock, FileSearch, Hand, Loader2, ShieldAlert, ShieldX, TriangleAlert } from "lucide-react";
 import type { ChatEvent } from "@/lib/sse";
 
 type Step = { icon: React.ReactNode; label: React.ReactNode; detail?: string; done: boolean };
@@ -40,8 +40,15 @@ function toSteps(events: ChatEvent[], live: boolean): Step[] {
         label: `Searched documents for "${e.query}", ${(e.hits as unknown[]).length} results`,
         done: true,
       });
-    } else if (e.type === "guard" && e.blocked) {
-      steps.push({ icon: <ShieldX className="size-3.5 text-destructive" />, label: "Input blocked by guard", done: true });
+    } else if (e.type === "guard") {
+      // Events from before guard names existed carry only the score
+      const guard = (e.guard as string) ?? "input";
+      const label = e.label ? ` (${e.label})` : "";
+      steps.push(
+        e.blocked
+          ? { icon: <ShieldX className="size-3.5 text-destructive" />, label: `Input blocked by ${guard} guard${label}`, done: true }
+          : { icon: <ShieldAlert className="size-3.5 text-amber-500" />, label: `Flagged by ${guard} guard${label}`, done: true },
+      );
     } else if (e.type === "interrupt") {
       steps.push({ icon: <Hand className="size-3.5 text-amber-500" />, label: "Waiting for approval", done: true });
     } else if (e.type === "error") {
