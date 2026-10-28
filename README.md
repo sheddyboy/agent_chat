@@ -481,7 +481,9 @@ flowchart LR
     hp["HotpotQA distractor<br/>200 questions"] --> setup["evals.hotpot<br/>embed passages into eval Qdrant<br/>upload datasets to Phoenix"]
     setup --> r["evals.retrieval<br/>rerank on vs off"]
     setup --> a["evals.answers<br/>full graph + judge"]
-    dp["deepset/prompt-injections"] --> g["evals.guard"]
+    gd["deepset/prompt-injections, tweet_eval hate,<br/>civil_comments"] --> g["evals.guard<br/>one suite per guard"]
+    tc["lmsys/toxic-chat<br/>300 real prompts"] --> pl["evals.pipeline<br/>all input guards"]
+    wp["30 written PII cases"] --> pi["evals.pii"]
     wr["31 written prompts"] --> t["evals.tools"]
     r --> px["Phoenix experiments"]
     a --> px
@@ -493,7 +495,9 @@ flowchart LR
 |---|---|---|
 | `evals.retrieval` | `hotpot-retrieval-v1` (200 HotpotQA questions) | hit@5, recall@5 and MRR over gold paragraph titles, with and without the reranker |
 | `evals.answers` | `hotpot-answers-v1` (50 questions) | Full graph with only `search_documents` enabled: used-search, contains-answer, answer-recall, and a faithfulness judge (`gpt-oss`, never grading its own answers) for `qwen3:8b` and `llama3.1:8b` |
-| `evals.guard` | `deepset/prompt-injections` test split | Accuracy, missed injections and false blocks, plus a precision / recall / FPR table at 0.5, 0.7 and 0.9 |
+| `evals.guard` | One suite per classifier guard: `injection` on the `deepset/prompt-injections` test split, `hate` on 300 balanced `tweet_eval` hate tweets, `toxicity` (insult, severe toxicity or identity attack >= 0.5) and `threat` on 300 and 200 balanced `civil_comments` | Correct, missed and false flags, plus a precision / recall / FPR table at 0.5, 0.7 and 0.9. Experiments are named guard, model and threshold, so a model swapped in `policy.py` shows up side by side |
+| `evals.pipeline` | `guard-pipeline-toxicchat-v1`: 300 balanced `lmsys/toxic-chat` prompts real users sent a chatbot | `check_input` with every guard: correct, missed and false blocks against the human toxic or jailbreak label, and how often each guard fired on harmful and harmless prompts |
+| `evals.pii` | `guard-pii-v1`: 30 written cases (secrets in disclosures and tasks, plus harmless details) | leaked (a secret reaches the model), over-redacted (a harmless message changed), blocked (all are harmless, so any block is a false positive) |
 | `evals.tools` | `tool-routing-v1` (31 written prompts) | Whether the first agent step calls the expected tool, or none, per model |
 
 Run them with Phoenix and Ollama up. The backend can keep running, since the evals use their own Qdrant folder:
@@ -503,7 +507,9 @@ cd backend
 uv run python -m evals.hotpot      # once: builds the eval store and uploads the HotpotQA datasets
 uv run python -m evals.retrieval
 uv run python -m evals.answers     # slow: full graph runs plus a judge call per question
-uv run python -m evals.guard
+uv run python -m evals.guard      # every guard suite; or one: evals.guard hate
+uv run python -m evals.pipeline
+uv run python -m evals.pii
 uv run python -m evals.tools
 ```
 
@@ -617,7 +623,7 @@ backend/
   overview/           /overview: dashboard widgets
   briefing/           /briefing: compose, briefings table, morning scheduler
   tools/              ALL_TOOLS and SENSITIVE_TOOLS registry, plus tools with no feature of their own
-  evals/              hotpot setup, retrieval, answers, guard, tools suites
+  evals/              hotpot setup, retrieval, answers, guard, pipeline, pii, tools suites
   data/               everything the app writes (gitignored)
 frontend/
   app/                / overview, c/ and c/[id] chat, documents, briefing, weather, resume
