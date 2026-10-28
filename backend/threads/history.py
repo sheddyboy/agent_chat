@@ -21,7 +21,14 @@ def to_ui_messages(messages: list, interrupts, thread_id: str) -> list[dict]:
                     "images": kwargs.get("images", []),
                 }
             )
-            ui.append({"role": "assistant", "content": "", "events": []})
+            # Warn guards let the turn through; their flag rides on the user message
+            flag = kwargs.get("guard", {})
+            warned = [] if flag.get("blocked") else [f for f in flag.get("findings", []) if f["flagged"]]
+            events = [
+                {"type": "guard", "blocked": False, "guard": f["guard"], "label": f["label"], "score": round(f["score"], 3)}
+                for f in warned
+            ]
+            ui.append({"role": "assistant", "content": "", "events": events})
             continue
         if not ui:
             continue
@@ -30,8 +37,17 @@ def to_ui_messages(messages: list, interrupts, thread_id: str) -> list[dict]:
         if isinstance(msg, AIMessage):
             if reasoning := msg.additional_kwargs.get("reasoning_content"):
                 events.append({"type": "reasoning", "text": reasoning})
-            if "guard_score" in msg.response_metadata:
-                events.append({"type": "guard", "blocked": True, "score": msg.response_metadata["guard_score"]})
+            if "guard_score" in (meta := msg.response_metadata):
+                # Threads blocked before guard names existed have only the score
+                events.append(
+                    {
+                        "type": "guard",
+                        "blocked": True,
+                        "guard": meta.get("guard", "injection"),
+                        "label": meta.get("guard_label", ""),
+                        "score": meta["guard_score"],
+                    }
+                )
             for call in msg.tool_calls:
                 args[call["id"]] = call["args"]
                 events.append({"type": "tool_start", "id": call["id"], "name": call["name"], "args": call["args"]})
