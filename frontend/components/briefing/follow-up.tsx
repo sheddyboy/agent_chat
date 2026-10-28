@@ -112,7 +112,7 @@ export function FollowUp({
           ref={input}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask a follow-up about today..."
+          placeholder="Ask a follow-up about this briefing..."
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
         <button

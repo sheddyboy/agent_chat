@@ -2,12 +2,15 @@ import re
 from datetime import datetime
 
 from briefing import as_text, collect, render, save_as_thread, write_briefing
-from db import get_briefing, list_briefings, save_briefing
+from db import delete_thread, get_briefing, list_briefings, save_briefing
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from tracing import tracer
 
 router = APIRouter(prefix="/briefing", tags=["briefing"])
+
+# save_as_thread writes 4 messages: the ask, the tool call, the data and the briefing
+BRIEFING_MESSAGES = 4
 
 
 def make_briefing() -> tuple[dict, str, str]:
@@ -28,9 +31,17 @@ def shown(row: dict) -> dict:
 async def briefing(request: Request):
     # Google and Ollama calls block, so they run off the event loop
     data, text_in, text = await run_in_threadpool(make_briefing)
-    thread_id = await save_as_thread(request.app.state.graph, text_in, text)
+    graph = request.app.state.graph
+    thread_id = await save_as_thread(graph, text_in, text)
     day = f"{datetime.now():%Y-%m-%d}"
+    replaced = get_briefing(day)
     save_briefing(day, thread_id, data, text)
+    # A regenerated briefing's old chat goes too, unless it holds follow-up questions
+    if replaced:
+        state = await graph.aget_state({"configurable": {"thread_id": replaced["thread_id"]}})
+        if len(state.values.get("messages", [])) <= BRIEFING_MESSAGES:
+            await graph.checkpointer.adelete_thread(replaced["thread_id"])
+            delete_thread(replaced["thread_id"])
     return shown(get_briefing(day))
 
 
