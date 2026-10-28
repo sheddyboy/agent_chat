@@ -6,12 +6,13 @@ It is a working showcase of:
 
 - **Agent orchestration** with LangGraph (plain function nodes, direct `llm.invoke()`, no LCEL)
 - **Tools and MCP**, local `@tool` functions and MCP servers side by side
-- **RAG as a tool**: PDF ingestion, hybrid dense + BM25 search, cross-encoder reranking, inline citations
+- **RAG as a tool**: PDF ingestion, hybrid dense + BM25 search, cross-encoder reranking, inline citations; a chat searches the files attached to it
 - **Human-in-the-loop**: sensitive tools pause the run until you approve or reject
 - **Input guard**: an ONNX prompt-injection classifier in front of the agent
 - **Ask about images**: attach a screenshot or photo and ask a local vision model (qwen3-vl) about it
 - **Voice**: local speech to text (Parakeet) and text to speech (Kokoro) on onnxruntime
 - **Draw**: the agent can generate images with SDXL Turbo on the Mac's GPU, shown inline in the answer
+- **Mail and calendar**: read-only Gmail and Google Calendar tools (search and read mail, list events, find free slots) after a one-time Google login, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
 - **Overview**: a home page with today's schedule, inbox, weather, recent chats and system status; chat lives at `/c`
 - **Briefing**: a daily page with what needs attention, today's (and in the evening tomorrow's) calendar, the mail worth a look and the weather; written on first open, with past days and follow-up questions on the page
 - **Weather**: a weather app page with saved places and search, now, the next 24 hours, 7 days, wind, humidity, UV and sun times, refreshed every 15 minutes; rain alerts from 15-minute data on the Overview, and a `get_weather` chat tool (Open-Meteo, no key)
@@ -144,13 +145,29 @@ cd backend && uv run uvicorn main:app --port 8000
 cd frontend && pnpm install && pnpm dev
 ```
 
-Open http://localhost:3000. Upload a PDF on the Documents page, then ask about it in the chat.
+Open http://localhost:3000. Upload a PDF on the Documents page and press "Ask about this", or attach it in a chat from the `+` menu, then ask about it. A chat only searches the files attached to it; set `SEARCH_SCOPE=all` to search the whole library instead.
 
-To enable web search, create `backend/.env`:
+Optional settings go in `backend/.env`:
 
 ```bash
+# Web search
 TAVILY_API_KEY=tvly-...
+# Weather: becomes the Home place on first start, used by the Overview, briefing and get_weather
+WEATHER_LAT=52.37
+WEATHER_LON=4.90
+WEATHER_PLACE=Amsterdam
 ```
+
+### Optional: Google mail and calendar
+
+The mail and calendar tools, the Overview's inbox and schedule, and the briefing read your Google account (read-only).
+
+1. In Google Cloud, create a project, turn on the Gmail API and the Google Calendar API, and create an OAuth client of type Desktop app.
+2. Save its JSON as `backend/data/secrets/credentials.json`.
+3. Log in once from `backend/`: `uv run python -m integrations.google_auth`. This saves `data/secrets/token.json`.
+4. Set the OAuth app to In production (unverified is fine for personal use), or Google expires the login after 7 days.
+
+Restart the backend and the tools appear. The details and limits of each tool are in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 ### Try it from the terminal
 
@@ -190,7 +207,7 @@ stateDiagram-v2
 | Node | What it does |
 |---|---|
 | `guard_input` | Scores the latest user message with the injection classifier. At or above `guard_threshold` it emits a `guard` event and ends the turn with a refusal `AIMessage`, so thread history stays coherent. |
-| `agent` | Builds `ChatOllama` for the thread's model, binds only the enabled tools, calls `llm.invoke()`. With `think` on, reasoning is moved into `reasoning_content` and streamed separately. |
+| `agent` | Builds `ChatOllama` for the thread's model, binds only the enabled tools, calls `llm.invoke()`. With `think` on, reasoning is moved into `reasoning_content` and streamed separately. With files attached it adds a note naming them; with none attached (and `search_scope` at `attachments`) it leaves out `search_documents`. |
 | `approval` | If any tool call is in `SENSITIVE_TOOLS`, calls `interrupt()` and waits. Reject answers every call in the message with a ToolMessage so the agent can adapt. |
 | `tools` | Prebuilt `ToolNode` holding all local and MCP tools. |
 
@@ -202,13 +219,14 @@ class ChatState(TypedDict, total=False):
     model: str
     enabled_tools: list[str]  # missing means all tools
     think: bool
+    attachments: Annotated[list[dict], merge_attachments]  # [{doc_id, name}], only accumulate
 ```
 
 RAG is a tool (`search_documents`), not a fixed pipeline step. The agent decides when to retrieve.
 
 ## Streaming events
 
-Every stream (`/chat`, `/chat/{id}/resume`, `/documents`) speaks one vocabulary: each SSE message is a JSON object with a `type` field.
+Every stream (`/chat`, `/chat/{id}/resume`, `/documents`, `/briefing`, `/jobs/{id}/events`) speaks one vocabulary: each SSE message is a JSON object with a `type` field. These streams all run as [background jobs](#api-reference), so each one starts with a `job` event.
 
 ```mermaid
 sequenceDiagram
@@ -240,6 +258,7 @@ sequenceDiagram
 
 | type | Payload | Source |
 |---|---|---|
+| `job` | `job_id`, `kind`, `ref` | always first, from the job runner; `ref` is the thread or doc id |
 | `node_start` | `node` | `tasks` stream mode, a task without a `result` |
 | `token` | `text` | `messages` stream mode |
 | `reasoning` | `text` | `reasoning_content` on message chunks, when thinking is on |
@@ -250,6 +269,9 @@ sequenceDiagram
 | `ingestion` | `doc_id`, `stage` (load / chunk / embed / store), `done`, `total` | ingestion pipeline |
 | `interrupt` | `tool_calls`, `thread_id` | `__interrupt__` update |
 | `guard` | `blocked`, `score` | `custom`, from `guard_input` |
+| `stage` | `stage` (`gathering`, `writing`) | briefing |
+| `briefing` | `briefing` | briefing, the finished page data |
+| `title` | `title`, `thread_id` | a new chat's generated title, before `done` |
 | `error` | `message` | any exception in the stream |
 | `done` | `trace_id`, `thread_id` | always last |
 
@@ -257,16 +279,20 @@ Tools emit fully formed events through `get_stream_writer()` and `/chat` forward
 
 ## Tools and MCP
 
-Local tools live in [backend/tools/](backend/tools/), one file each, registered in `ALL_TOOLS`:
+Local tools live in their feature's `tool.py` (or in [backend/tools/](backend/tools/) when they belong to no feature) and are registered in `ALL_TOOLS` in [backend/tools/\_\_init\_\_.py](backend/tools/__init__.py). Some are only registered when what they need is there:
 
-| Tool | Purpose | Sensitive |
-|---|---|---|
-| `get_datetime` | Current local date, time and weekday | |
-| `calculator` | Safe arithmetic via an AST walker (`+ - * / // % **`) | |
-| `search_documents` | Hybrid search + rerank over uploaded documents | |
-| `save_note` | Writes a markdown note to `data/notes/` | yes |
-| `generate_image` | Draws a 512x512 image with SDXL Turbo, stored like uploaded images | yes |
-| `web_search` | Tavily search, registered only when `TAVILY_API_KEY` is set | |
+| Tool | Purpose | Registered | Sensitive |
+|---|---|---|---|
+| `get_datetime` | Current local date, time and weekday | always | |
+| `calculator` | Safe arithmetic via an AST walker (`+ - * / // % **`) | always | |
+| `search_documents` | Hybrid search + rerank over the chat's attached documents | always (left out of a chat with no attachments) | |
+| `save_note` | Writes a markdown note to `data/notes/` | always | yes |
+| `generate_image` | Draws a 512x512 image with SDXL Turbo, stored like uploaded images | always | yes |
+| `get_weather` | Forecast for a saved place, a searched place or Home, for a given day | always | |
+| `web_search` | Tavily search | `TAVILY_API_KEY` is set | |
+| `search_emails`, `read_email` | Search Gmail by time range, sender or topic; open one email | `data/secrets/token.json` exists | |
+| `list_events`, `free_slots` | Calendar events for a day or range; free gaps in working hours | the token has `calendar.readonly` | |
+| `read_resume`, `edit_resume` | Read the resume LaTeX; find and replace in it, saved only if it compiles | `tectonic` is on PATH | `edit_resume` |
 
 MCP servers are declared in [backend/mcp_servers.json](backend/mcp_servers.json) in `MultiServerMCPClient` format and loaded once at startup:
 
@@ -324,6 +350,8 @@ flowchart LR
     tm --> ag["agent answers<br/>citing [n] inline"]
 ```
 
+With `search_scope` at `attachments` (the default), the hybrid query is filtered to the `doc_id`s attached to the chat, which `search_documents` reads from graph state; the model never sees that argument. The evals use `all`.
+
 Sources ride on the `search_documents` ToolMessage `artifact` rather than a separate state key. That avoids reducer conflicts on parallel calls and keeps sources tied to their turn in the checkpointed history. Page numbers from pymupdf4llm are 0-indexed and shown 1-indexed.
 
 ## Human-in-the-loop
@@ -376,15 +404,20 @@ The Next.js app in [frontend/](frontend/) calls the API directly with CORS. A Ne
 
 ```mermaid
 flowchart TB
-    sse["lib/sse.ts<br/>streamEvents()"] --> page["app/page.tsx<br/>switch on event.type"]
-    page --> msg["Assistant message<br/>Streamdown: code, math, Mermaid"]
-    page --> steps["Steps + thinking dropdown<br/>node_start, tool_*, reasoning"]
-    page --> act["Activity panel<br/>tool calls, timings, View trace"]
-    page --> src["Sources panel<br/>retrieval hits"]
-    page --> appr["Approval card<br/>interrupt"]
+    sse["lib/sse.ts<br/>streamEvents(), followJob()"] --> chat["components/chat.tsx<br/>switch on event.type"]
+    routes["app/c, app/c/[id]"] --> chat
+    chat --> msg["Assistant message<br/>Streamdown: code, math, Mermaid"]
+    chat --> steps["Steps + thinking dropdown<br/>node_start, tool_*, reasoning"]
+    chat --> act["Activity panel<br/>tool calls, timings, View trace"]
+    chat --> src["Sources panel<br/>retrieval hits"]
+    chat --> appr["Approval card<br/>interrupt"]
     docs["app/documents/page.tsx"] --> sse
     docs --> prog["Upload progress<br/>ingestion stages"]
-    side["Sidebar, model switcher,<br/>tool picker, theme toggle"] --> page
+    brief["app/briefing/page.tsx<br/>cards + follow-ups"] --> sse
+    home["app/page.tsx Overview<br/>components/overview/*"] --> widgets["/overview/*, /weather/alert,<br/>/briefing/today, /threads, /resume"]
+    wx["app/weather/page.tsx"] --> wapi["/weather"]
+    res["app/resume/page.tsx<br/>editor + PDF preview"] --> rapi["/resume"]
+    side["Sidebar, model switcher,<br/>tool picker, theme toggle"] --> chat
 ```
 
 | Feature | Detail |
@@ -396,7 +429,12 @@ flowchart TB
 | Sources panel | Reranked passages with document, page and score. |
 | Mic button | Push-to-talk in the composer. Records, converts to 16 kHz WAV in the browser, and appends the transcript to the input; nothing is sent until you press Send. Stops itself at 25 s. |
 | Read aloud | A speaker button under each answer, one answer at a time. Code is skipped and tables are announced. Answers to questions asked by voice are read automatically. |
-| Documents page | Upload with live per-stage progress. Lists uploads from the current browser session only (there is no list endpoint yet). |
+| Attachments | "Upload PDFs" in the `+` menu ingests a file and attaches it to the chat; the library picker attaches one already ingested. A chat searches only its attachments. |
+| Documents page | The library from `GET /documents` with status, pages and chunks; upload with live per-stage progress, which a reopened page picks up again. "Ask about this" opens a new chat with the file attached. |
+| Overview | `/`: today's schedule, inbox, weather with a rain banner, the briefing's heads up, recent chats, the resume and system status. Each widget loads on its own and says so when its source is not set up. |
+| Briefing | `/briefing`: today's briefing as cards, written on first open (with stages), past days, and follow-up questions that run as a chat. |
+| Weather | `/weather`: saved places, search and my location, now, 24 hours, 7 days and details. |
+| Resume | `/resume`: LaTeX editor with a live PDF preview, the compile log and version history. |
 
 ## Observability
 
@@ -458,10 +496,14 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| `POST` | `/chat` | `{message, model?, thread_id?, enabled_tools?, think?, attachments?, images?}` | SSE stream. A new `thread_id` is created when omitted. |
+| `POST` | `/chat` | `{message, model?, thread_id?, enabled_tools?, think?, attachments?, images?}` | SSE stream. A new `thread_id` is created when omitted. `409` while an answer is still being written in that thread. |
 | `POST` | `/chat/{thread_id}/resume` | `{"action": "approve" \| "reject"}` | SSE stream, or `409` with no pending approval |
-| `POST` | `/documents` | multipart `file` | SSE stream of `ingestion` events, then `done` |
-| `GET` | `/documents/{doc_id}` | | `{doc_id, chunks}` |
+| `GET` | `/threads` | `?limit=30&before=` | `{threads: [{thread_id, title, created_at, updated_at}], next}`, most recently updated first; pass `next` as `before` for the next page |
+| `GET` | `/threads/{thread_id}` | | The thread plus `model`, `enabled_tools`, `think` and `messages` (rebuilt with their events), or `404` |
+| `DELETE` | `/threads/{thread_id}` | | `{deleted}`; removes the checkpoints too |
+| `POST` | `/documents` | multipart `file` | SSE stream of `ingestion` events, then `done`; the same file twice joins one job |
+| `GET` | `/documents` | | The library, newest first: `[{doc_id, name, path, size_bytes, pages, chunks, status, error, created_at}]`; `status` is `ingesting`, `ready` or `failed` |
+| `GET` | `/documents/{doc_id}` | | One library row, or `404` |
 | `POST` | `/briefing` | | SSE: starts (or joins) the job writing today's briefing: `job`, `stage` (`gathering`, `writing`), `briefing`, `done`; takes 15 to 45 s |
 | `GET` | `/briefing` | | `[{day, created_at}]`, newest first |
 | `GET` | `/briefing/{day}` | | `today` or `YYYY-MM-DD`: `{day, created_at, thread_id, heads_up, mail, mail_text, mail_note, today, tomorrow, weather, job_id}`; `202 {job_id}` while today's is being written; `404` when none |
@@ -489,7 +531,7 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 
 The first voice call downloads its model (about 650 MB for speech to text, 140 MB for text to speech), so it takes a while once. After that a sentence takes well under a second each way.
 
-`enabled_tools` left out keeps the thread's earlier choice; never set means all tools. `images` is a list of `{image_id, name}` from `POST /images`; they belong to that message only. A model without Ollama's `vision` capability gets an `[image: name]` placeholder instead.
+`enabled_tools` left out keeps the thread's earlier choice; never set means all tools. `attachments` is a list of `doc_id`s from the library; each must be `ready` (`400` otherwise), and they stay attached to the thread for later turns. `images` is a list of `{image_id, name}` from `POST /images`; they belong to that message only. A model without Ollama's `vision` capability gets an `[image: name]` placeholder instead.
 
 ## Configuration
 
@@ -506,6 +548,7 @@ Backend settings are in [backend/core/config.py](backend/core/config.py) (pydant
 | `tavily_api_key` | empty | `web_search` is registered only when set |
 | `cors_origins` | `["http://localhost:3000"]` | |
 | `qdrant_path` / `qdrant_collection` | `data/qdrant` / `documents` | |
+| `search_scope` | `attachments` | `attachments`: a chat searches only its attached files; `all`: the whole collection (the evals use this) |
 | `embedding_model` / `sparse_model` | `qwen3-embedding:0.6b` / `Qdrant/bm25` | |
 | `chunk_size` / `chunk_overlap` | `1000` / `150` | |
 | `retrieval_k` / `rerank_top_n` | `20` / `5` | |
@@ -520,6 +563,11 @@ Backend settings are in [backend/core/config.py](backend/core/config.py) (pydant
 | `image_model` / `image_vae` | `stabilityai/sdxl-turbo` / `madebyollin/sdxl-vae-fp16-fix` | About 7 GB, downloaded to the Hugging Face cache on the first drawing |
 | `image_steps` | `2` | 1 to 4 for Turbo |
 | `image_unload_after_s` | `300` | Idle seconds before the image model is freed |
+| `google_credentials` / `google_token` | `data/secrets/credentials.json` / `data/secrets/token.json` | The OAuth client and the token the login saves; the mail and calendar tools need the token |
+| `work_day_start` / `work_day_end` | `09:00` / `18:00` | `free_slots` only looks inside these hours, local time |
+| `weather_lat` / `weather_lon` / `weather_place` | unset / unset / `Home` | Seeds the Home place on first start; without it, add a place on the Weather page |
+| `briefing_at` | `07:00` | Local time the morning briefing is written if none exists yet; `""` turns it off |
+| `resume_dir` | `data/resume` | `resume.tex`, its PDF and earlier versions |
 
 Frontend environment:
 
@@ -553,11 +601,18 @@ backend/
   evals/              hotpot setup, retrieval, answers, guard, tools suites
   data/               everything the app writes (gitignored)
 frontend/
-  app/                chat page, documents page
-  components/         sidebar, steps, activity, sources, approval card, tool picker
-  lib/sse.ts          POST + SSE reader
+  app/                / overview, c/ and c/[id] chat, documents, briefing, weather, resume
+  components/         chat, sidebar, steps, activity, sources, approval card, tool picker, attachments
+    overview/         Overview widgets and the shared timeline
+    briefing/         briefing cards and follow-ups
+    weather/          now, hourly, daily, details, places
+    resume/           editor, preview, compile log, history
+    ui/               shadcn/ui primitives
+  lib/                sse.ts (POST + SSE reader, job follow), upload.ts, voice.ts
 docs/
   PLAN.md             design, decisions log, build order
+  INTEGRATIONS.md     Gmail, Calendar, briefing: setup, behavior, limits
+  FUNTODOS.md         feature ideas
 ```
 
 ## Extending
@@ -565,7 +620,7 @@ docs/
 The rule is extend by adding, not rewiring.
 
 - **A feature:** add a folder with `router.py` (thin, its own prefix and tags), plus `store.py` (its table and an `init(conn)`), `tool.py` and logic files as needed. Then add one line each to `ROUTERS` and `STORES` in `main.py`, and its tool to `tools/__init__.py`. Features import from `core/`, `jobs/` and `integrations/`; imports between features must not form a cycle.
-- **A tool:** put an `@tool` function in its feature's `tool.py` (or in `backend/tools/` if it belongs to no feature) and add one line to `ALL_TOOLS`. If it has side effects, add its name to `SENSITIVE_TOOLS` and it gets an approval card for free.
+- **A tool:** put an `@tool` function in its feature's `tool.py` (or in `backend/tools/` if it belongs to no feature) and add one line to `ALL_TOOLS`. If it has side effects, add its name to `SENSITIVE_TOOLS` and it gets an approval card for free. If it needs a key, token or binary, register it only when that exists, like `web_search`, so the agent never sees a tool that can't run.
 - **An MCP server:** add an entry to `mcp_servers.json`. Its tools appear in `/tools` grouped under the server name. Add any write tools to `SENSITIVE_TOOLS`.
 - **A model:** `ollama pull` it and add it to `chat_models`. Thinking support is detected from Ollama.
 - **An event:** call `get_stream_writer()({"type": "...", ...})` from a node or tool, then add one `case` in the frontend.
@@ -576,6 +631,10 @@ The rule is extend by adding, not rewiring.
 - **Qdrant "already accessed by another instance".** Local mode locks the folder to one process. Inspect it through the API, or stop uvicorn first. The evals use their own folder for this reason.
 - **The first filesystem MCP call takes ~20s.** Each call spawns a fresh `npx` process. Expected for now.
 - **`web_search` is missing from the tool picker.** Set `TAVILY_API_KEY` in `backend/.env` and restart.
+- **The agent ignores my PDF.** A chat only searches the files attached to it. Attach it from the `+` menu, or use "Ask about this" on the Documents page.
+- **Mail or calendar tools are missing.** There is no `data/secrets/token.json` yet, or it was saved before the calendar scope was added. Run `uv run python -m integrations.google_auth` again and restart.
+- **Google asks to log in again after a week.** The OAuth app is in Testing mode, which expires refresh tokens after 7 days. Set it to In production.
+- **The Resume page or resume tools are missing.** Install Tectonic (`brew install tectonic`) and restart the backend.
 - **A model has no thinking toggle.** Only models whose Ollama capabilities include `thinking` get one; a model that is not pulled shows without it.
 - **The first drawing takes a while.** The first call downloads about 7 GB, and every cold start loads the model (10 to 15 s). Warm drawings take a few seconds. SDXL Turbo is under a non-commercial research license.
 - **Prices render as math.** Inline `$...$` math is on in Streamdown, so text with two dollar amounts can occasionally be read as a formula.
