@@ -72,19 +72,36 @@ def with_images(messages: list, vision: bool) -> list:
     return out
 
 
+def without_blocked(messages: list) -> list:
+    """Drop blocked user messages and their refusals, so the model never reads them.
+
+    Only the copies sent to the model change; the checkpoint keeps them for history.
+    """
+    return [
+        msg
+        for msg in messages
+        if not (isinstance(msg, HumanMessage) and msg.additional_kwargs.get("guard", {}).get("blocked"))
+        and not (isinstance(msg, AIMessage) and "guard_score" in msg.response_metadata)
+    ]
+
+
 def guard_input(state: ChatState) -> Command:
-    text = state.get("messages", [])[-1].text
-    score = injection_score(text)
+    last = state.get("messages", [])[-1]
+    score = injection_score(last.text)
     if score < settings.guard_threshold:
         return Command(goto="agent")
-    logger.warning("blocked prompt injection (score %.3f): %r", score, text[:200])
+    logger.warning("blocked prompt injection (score %.3f): %r", score, last.text[:200])
     get_stream_writer()({"type": "guard", "blocked": True, "score": round(score, 3)})
+    # Same id, so add_messages replaces the message with this flagged copy
+    flagged = last.model_copy(
+        update={"additional_kwargs": {**last.additional_kwargs, "guard": {"blocked": True, "score": round(score, 3)}}}
+    )
     # The refusal keeps thread history coherent: every user turn gets a reply
     refusal = AIMessage(
         "Blocked: this message looks like a prompt-injection attempt.",
         response_metadata={"guard_score": round(score, 3)},
     )
-    return Command(goto=END, update={"messages": [refusal]})
+    return Command(goto=END, update={"messages": [flagged, refusal]})
 
 
 def agent(state: ChatState) -> dict:
@@ -102,7 +119,7 @@ def agent(state: ChatState) -> dict:
     tools = (
         ALL_TOOLS if enabled is None else [t for t in ALL_TOOLS if t.name in enabled]
     )
-    messages = with_images(state.get("messages", []), "vision" in capabilities(model))
+    messages = with_images(without_blocked(state.get("messages", [])), "vision" in capabilities(model))
     attachments = state.get("attachments", [])
     if attachments:
         messages = [attachment_note(attachments), *messages]
