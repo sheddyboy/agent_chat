@@ -6,12 +6,13 @@ from core.config import settings
 from core.db import init_db
 from jobs import store as jobs_store
 from jobs.router import router as jobs_router
+from voice.router import router as voice_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import scheduler
-from routes import briefing, catalog, chat, documents, images, overview, resume, threads, voice, weather
+from routes import briefing, catalog, chat, documents, images, overview, resume, threads, weather
 from tools import ALL_TOOLS
 from tools.mcp_loader import load_mcp_tools
 
@@ -40,6 +41,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (chat, threads, documents, images, catalog, voice, briefing, overview, resume, weather):
-    app.include_router(module.router)
-app.include_router(jobs_router)
+ROUTERS = (
+    chat.router,
+    threads.router,
+    documents.router,
+    images.router,
+    catalog.router,
+    voice_router,
+    briefing.router,
+    overview.router,
+    resume.router,
+    weather.router,
+    jobs_router,
+)
+for router in ROUTERS:
+    app.include_router(router)
