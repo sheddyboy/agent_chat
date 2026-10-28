@@ -180,7 +180,7 @@ Backend slices are tested with `curl -N` before any frontend work.
 - [ ] **18. Calendar and briefing.** Read-only Google Calendar tools and an on-demand morning briefing (I2 and I5 in `INTEGRATIONS.md`).
   - [x] **18a. Calendar.** `google_auth.py` adds the `calendar.readonly` scope and loads the token with the scopes it was saved with, so a Gmail-only token keeps working. `integrations/google_calendar.py` reads all my calendars: `parse_when` (`today`, `tomorrow`, `this week`, `next week`, a weekday, `3d`, a date or a range), events from one batch request, free slots between timed events within working hours. `search_emails` also accepts a single date as `since`. Titles and locations go through the guard. `tools/google_calendar.py` adds `list_events` and `free_slots`, registered only when the token has the calendar scope.
   - [x] **18b. Briefing on demand.** `briefing.py` gathers the last 24h of mail (no promotions or social), today's events with clashes found in code, and the weather (Open-Meteo), writes the digest with one model call and saves it as a thread with the data as a `daily_briefing` tool step, so follow-ups can open the emails. `POST /briefing` and a Briefing button in the sidebar.
-  - [ ] **18c. Scheduled briefing (later).** Run the briefing at a set time from the backend, skip if today's exists. GitHub reviews join it once I7 exists.
+  - [x] **18c. Scheduled briefing.** Done in 23b. Run the briefing at a set time from the backend, skip if today's exists. GitHub reviews join it once I7 exists.
   Done when: "what's on my calendar this week", "when am I free tomorrow for an hour" and "prep me for my next meeting" work in chat, and the Briefing button opens a new chat with today's digest.
 
 - [x] **19. Overview.** A home page of widgets to glance at, next to chat.
@@ -205,6 +205,13 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **22b. Weather page.** `/weather`: place chips with Home, search with suggestions, My location (browser geolocation), now with feels like and the summary, a sideways 24-hour strip with sunrise and sunset and rain bars, 7 days with low to high bars on one scale, and wind, humidity, UV and sun tiles. Refreshes every 15 minutes and on focus. Night icons after dark.
   - [x] **22c. Overview and briefing.** The Overview card shows the next 6 hours with icons and rain chances and links to the page; a rain banner sits above the Overview when an alert is due. Today's briefing shows the live card; past days keep their snapshot "as of" when written.
   Done when: search, save, switch and Home work; the page and cards show live data and update; the banner shows for a place with rain coming; "will it rain in X on Saturday" in chat uses `get_weather`.
+
+- [x] **23. Background jobs.** Long tasks no longer stop when the page closes.
+  - [x] **23a. Runner.** `jobs.py` runs any event generator in its own asyncio task and keeps its events; `follow` replays them and then streams live ones, so a page can leave and come back. A `jobs` table records each job; on startup unfinished jobs become `interrupted` and documents left `ingesting` are marked failed. `GET /jobs`, `/jobs/{id}`, `/jobs/{id}/events`. In-process on purpose (local-first, no Redis or Celery); jobs do not survive a restart.
+  - [x] **23b. Briefing job and schedule (finishes 18c).** `briefing.run()` yields real stages (`gathering`, `writing`) then the briefing; `POST /briefing` starts or joins the job, and `GET /briefing/today` answers `202 {job_id}` while one runs, so a revisit follows it instead of starting another. `scheduler.py` checks every minute and writes the briefing at `briefing_at` (default 07:00, empty turns it off) when none exists.
+  - [x] **23c. Ingestion job.** An upload starts (or joins) an `ingest` job per document; the Documents page reattaches to running ones.
+  - [x] **23d. Chat jobs.** Turns and approval resumes run as `chat` jobs; the thread id is fixed up front, so a new chat gets its URL with the first event. Opening a chat (or a briefing's follow-ups) with a running job shows the history up to that question and replays the answer live; a second message while one runs gets 409.
+  Done when: reloading or closing the tab mid-answer, mid-ingest or mid-briefing loses nothing, and a killed backend leaves jobs marked interrupted.
 
 ## Later ideas
 
