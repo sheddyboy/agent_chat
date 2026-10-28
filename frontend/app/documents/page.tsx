@@ -157,7 +157,7 @@ export default function Documents() {
                     </div>
                     {d.status === "ready" && (
                       <Link
-                        href={`/?attach=${d.doc_id}`}
+                        href={`/c?attach=${d.doc_id}`}
                         className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
                       >
                         <MessageSquarePlus className="size-3.5" />

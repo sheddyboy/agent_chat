@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { FileText, Loader2, MessageSquare, PanelLeft, Plus, Sparkles, Sun, Trash2 } from "lucide-react";
+import { CloudSun, FileText, FileUser, LayoutGrid, MessageSquare, PanelLeft, Plus, Sparkles, Sun, Trash2 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -36,10 +36,11 @@ export function Sidebar({
   const [threads, setThreads] = useState<Thread[]>([]);
   const [next, setNext] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
-  const [briefing, setBriefing] = useState<"idle" | "busy" | "failed">("idle");
   const sentinel = useRef<HTMLDivElement>(null);
   const loadingMore = useRef(false);
   const router = useRouter();
+  const pathname = usePathname();
+  const here = (path: string) => (pathname === path ? "bg-sidebar-accent text-foreground" : "");
   const label = collapsed ? "md:hidden" : "";
 
   function loadFirstPage() {
@@ -73,27 +74,11 @@ export function Sidebar({
     return () => observer.disconnect();
   }, [next]);
 
-  // The backend gathers mail, calendar and weather and saves the digest as a new chat
-  async function makeBriefing() {
-    setBriefing("busy");
-    try {
-      const r = await fetch(`${API}/briefing`, { method: "POST" });
-      if (!r.ok) throw new Error(`briefing failed: ${r.status}`);
-      const { thread_id } = await r.json();
-      setBriefing("idle");
-      loadFirstPage();
-      onClose();
-      router.push(`/c/${thread_id}`);
-    } catch {
-      setBriefing("failed");
-    }
-  }
-
   async function remove(id: string) {
     await fetch(`${API}/threads/${id}`, { method: "DELETE" });
     setThreads((prev) => prev.filter((t) => t.thread_id !== id));
     setConfirming(null);
-    if (id === currentId) router.push("/");
+    if (id === currentId) router.push("/c");
   }
 
   return (
@@ -119,19 +104,29 @@ export function Sidebar({
           </button>
         </div>
 
-        <Link href="/" onClick={onClose} className={`${item} ${disabled ? off : ""}`}>
+        <Link href="/" onClick={onClose} className={`${item} ${here("/")} ${disabled ? off : ""}`}>
+          <LayoutGrid className="size-4 shrink-0" />
+          <span className={label}>Overview</span>
+        </Link>
+        <Link href="/c" onClick={onClose} className={`${item} ${here("/c")} ${disabled ? off : ""}`}>
           <Plus className="size-4 shrink-0" />
           <span className={label}>New chat</span>
         </Link>
-        <button onClick={makeBriefing} disabled={disabled || briefing === "busy"} className={item} title="Briefing">
-          {briefing === "busy" ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Sun className="size-4 shrink-0" />}
-          <span className={label}>
-            {briefing === "busy" ? "Preparing briefing..." : briefing === "failed" ? "Briefing failed, retry" : "Briefing"}
-          </span>
-        </button>
-        <Link href="/documents" className={item}>
+        <Link href="/briefing" onClick={onClose} className={`${item} ${here("/briefing")}`}>
+          <Sun className="size-4 shrink-0" />
+          <span className={label}>Briefing</span>
+        </Link>
+        <Link href="/weather" onClick={onClose} className={`${item} ${here("/weather")}`}>
+          <CloudSun className="size-4 shrink-0" />
+          <span className={label}>Weather</span>
+        </Link>
+        <Link href="/documents" className={`${item} ${here("/documents")}`}>
           <FileText className="size-4 shrink-0" />
           <span className={label}>Documents</span>
+        </Link>
+        <Link href="/resume" className={`${item} ${here("/resume")}`}>
+          <FileUser className="size-4 shrink-0" />
+          <span className={label}>Resume</span>
         </Link>
 
         {threads.length > 0 && (

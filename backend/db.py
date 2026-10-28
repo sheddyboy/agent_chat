@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime
@@ -25,6 +26,25 @@ CREATE TABLE IF NOT EXISTS documents (
     error      TEXT,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS briefings (
+    day        TEXT PRIMARY KEY,  -- local date, YYYY-MM-DD; regenerating replaces it
+    thread_id  TEXT NOT NULL,     -- the chat that holds it, for follow-up questions
+    data       TEXT NOT NULL,     -- JSON of briefing.collect()
+    text       TEXT NOT NULL,     -- what the model wrote
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS places (
+    id         INTEGER PRIMARY KEY,
+    name       TEXT NOT NULL,
+    region     TEXT NOT NULL DEFAULT '',
+    country    TEXT NOT NULL DEFAULT '',
+    lat        REAL NOT NULL,
+    lon        REAL NOT NULL,
+    is_home    INTEGER NOT NULL DEFAULT 0,  -- the one the Overview, briefing and alerts use
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -43,6 +63,13 @@ def init_db():
     with closing(connect()) as conn, conn:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
+        # The location from settings becomes Home the first time, so weather keeps working
+        empty = conn.execute("SELECT count(*) FROM places").fetchone()[0] == 0
+        if empty and settings.weather_lat is not None:
+            conn.execute(
+                "INSERT INTO places (name, lat, lon, is_home, created_at) VALUES (?, ?, ?, 1, ?)",
+                (settings.weather_place, settings.weather_lat, settings.weather_lon, now()),
+            )
 
 
 def touch_thread(thread_id: str, title: str):
@@ -119,3 +146,62 @@ def list_documents() -> list[dict]:
     with closing(connect()) as conn:
         rows = conn.execute("SELECT * FROM documents ORDER BY created_at DESC").fetchall()
     return [dict(r) for r in rows]
+
+
+def save_briefing(day: str, thread_id: str, data: dict, text: str):
+    with closing(connect()) as conn, conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO briefings VALUES (?, ?, ?, ?, ?)",
+            (day, thread_id, json.dumps(data), text, now()),
+        )
+
+
+def get_briefing(day: str) -> dict | None:
+    with closing(connect()) as conn:
+        row = conn.execute("SELECT * FROM briefings WHERE day = ?", (day,)).fetchone()
+    return {**dict(row), "data": json.loads(row["data"])} if row else None
+
+
+def list_briefings(limit: int = 30) -> list[dict]:
+    with closing(connect()) as conn:
+        rows = conn.execute("SELECT day, created_at FROM briefings ORDER BY day DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_places() -> list[dict]:
+    with closing(connect()) as conn:
+        rows = conn.execute("SELECT * FROM places ORDER BY is_home DESC, created_at").fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_place(place_id: int) -> dict | None:
+    with closing(connect()) as conn:
+        row = conn.execute("SELECT * FROM places WHERE id = ?", (place_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def home_place() -> dict | None:
+    with closing(connect()) as conn:
+        row = conn.execute("SELECT * FROM places WHERE is_home = 1").fetchone()
+    return dict(row) if row else None
+
+
+def add_place(name: str, region: str, country: str, lat: float, lon: float) -> dict:
+    with closing(connect()) as conn, conn:
+        # The first place saved becomes Home
+        home = conn.execute("SELECT count(*) FROM places WHERE is_home = 1").fetchone()[0] == 0
+        cur = conn.execute(
+            "INSERT INTO places (name, region, country, lat, lon, is_home, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (name, region, country, lat, lon, int(home), now()),
+        )
+    return get_place(cur.lastrowid)
+
+
+def set_home(place_id: int):
+    with closing(connect()) as conn, conn:
+        conn.execute("UPDATE places SET is_home = (id = ?)", (place_id,))
+
+
+def delete_place(place_id: int):
+    with closing(connect()) as conn, conn:
+        conn.execute("DELETE FROM places WHERE id = ? AND is_home = 0", (place_id,))

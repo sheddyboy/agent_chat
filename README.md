@@ -12,6 +12,10 @@ It is a working showcase of:
 - **Ask about images**: attach a screenshot or photo and ask a local vision model (qwen3-vl) about it
 - **Voice**: local speech to text (Parakeet) and text to speech (Kokoro) on onnxruntime
 - **Draw**: the agent can generate images with SDXL Turbo on the Mac's GPU, shown inline in the answer
+- **Overview**: a home page with today's schedule, inbox, weather, recent chats and system status; chat lives at `/c`
+- **Briefing**: a daily page with what needs attention, today's (and in the evening tomorrow's) calendar, the mail worth a look and the weather; written on first open, with past days and follow-up questions on the page
+- **Weather**: a weather app page with saved places and search, now, the next 24 hours, 7 days, wind, humidity, UV and sun times, refreshed every 15 minutes; rain alerts from 15-minute data on the Overview, and a `get_weather` chat tool (Open-Meteo, no key)
+- **Resume**: an Overleaf-style LaTeX editor (Jake's Resume) with a live PDF preview, compiled locally with Tectonic; the agent can read and edit it behind an approval
 - **Live event streaming** over SSE: tokens, reasoning, node and tool steps, retrieval hits, approvals
 - **Observability and evals** with Phoenix: every chat is a trace, every eval suite is an experiment
 
@@ -109,6 +113,7 @@ flowchart LR
 - `npx` and `uvx` on your PATH (the MCP servers are launched with them)
 - [Ollama](https://ollama.com/) running locally
 - Optional: Tesseract, for OCR of scanned PDFs
+- Optional: [Tectonic](https://tectonic-typesetting.github.io) (`brew install tectonic`), for the resume page and tools
 - Optional: a [Tavily](https://tavily.com/) API key, for web search
 
 Pull the models:
@@ -456,6 +461,21 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 | `POST` | `/chat/{thread_id}/resume` | `{"action": "approve" \| "reject"}` | SSE stream, or `409` with no pending approval |
 | `POST` | `/documents` | multipart `file` | SSE stream of `ingestion` events, then `done` |
 | `GET` | `/documents/{doc_id}` | | `{doc_id, chunks}` |
+| `POST` | `/briefing` | | Writes today's briefing (replacing an earlier one) and returns it like `GET /briefing/{day}`; takes 15 to 45 s |
+| `GET` | `/briefing` | | `[{day, created_at}]`, newest first |
+| `GET` | `/briefing/{day}` | | `today` or `YYYY-MM-DD`: `{day, created_at, thread_id, heads_up, mail, mail_text, mail_note, today, tomorrow, weather}`, or `404` |
+| `GET` | `/weather` | `?place_id=` or `?lat=&lon=` | Home's forecast when neither: `{place, current, hourly (24), daily (7), minutely, summary, alert, fetched_at}`; cached 10 minutes |
+| `GET` | `/weather/alert` | | `{alert, place}` for Home; `alert` is null when no rain starts or stops within the hour |
+| `GET` | `/weather/search` | `?q=` | Up to 8 `{name, region, country, lat, lon}` |
+| `GET/POST` | `/weather/places` | `{name, region, country, lat, lon}` | Saved places; the first becomes Home |
+| `POST` | `/weather/places/{id}/home` | | Makes it Home |
+| `DELETE` | `/weather/places/{id}` | | Removes it; `400` for Home |
+| `GET` | `/resume` | | `{tex, updated_at, has_pdf}`; the first call starts from the template |
+| `PUT` | `/resume` | `{tex}` | `{ok, log, tex, updated_at, has_pdf}`; saved only if it compiles, `log` holds the LaTeX error |
+| `GET` | `/resume/pdf` | | the compiled PDF, or `404` |
+| `GET` | `/resume/history` | | `[{name, saved_at}]`, newest first |
+| `POST` | `/resume/restore` | `{name}` | same as `PUT /resume` |
+| `GET` | `/overview/{schedule,inbox,weather,status}` | | One widget's data; `{connected: false}` when its source is not set up, `502` when it fails |
 | `GET` | `/models` | | `{models: [{name, thinking, vision}], default}` |
 | `POST` | `/images` | multipart `file` (png, jpeg, webp, up to 10 MB) | `{image_id, name}`, or `400` |
 | `GET` | `/images/{image_id}` | | the image, or `404` |
