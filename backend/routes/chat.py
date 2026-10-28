@@ -1,6 +1,7 @@
 import uuid
 from typing import Literal
 
+import jobs
 from config import settings
 from db import get_document, get_thread, touch_thread
 from fastapi import APIRouter, HTTPException, Request
@@ -53,7 +54,7 @@ def stored_images(images: list[ImageRef]) -> list[dict]:
 
 
 async def stream_chat(graph, req: ChatRequest, attachments: list[dict], images: list[dict]):
-    thread_id = req.thread_id or str(uuid.uuid4())
+    thread_id = req.thread_id
     is_new = get_thread(thread_id) is None
     touch_thread(thread_id, req.message[:60])  # placeholder title until make_title's
     with tracer.start_as_current_span("chat", openinference_span_kind="chain") as span:
@@ -88,7 +89,9 @@ async def chat(req: ChatRequest, request: Request):
     # Checked before streaming starts, so a bad id is a plain 400
     attachments = ready_attachments(req.attachments or [])
     images = stored_images(req.images or [])
-    return EventSourceResponse(stream_chat(request.app.state.graph, req, attachments, images))
+    # Fixed here, so the job's first event can give a new chat its id (and URL) at once
+    req = req.model_copy(update={"thread_id": req.thread_id or str(uuid.uuid4())})
+    return start_turn(req.thread_id, stream_chat(request.app.state.graph, req, attachments, images))
 
 
 @router.post("/{thread_id}/resume")
@@ -97,4 +100,11 @@ async def resume(thread_id: str, req: ResumeRequest, request: Request):
     state = await graph.aget_state({"configurable": {"thread_id": thread_id}})
     if not state.interrupts:
         raise HTTPException(409, "no pending approval on this thread")
-    return EventSourceResponse(stream_resume(graph, thread_id, req.action))
+    return start_turn(thread_id, stream_resume(graph, thread_id, req.action))
+
+
+def start_turn(thread_id: str, events) -> EventSourceResponse:
+    """Run the turn as a job, so the answer keeps going if the page closes, and follow it."""
+    if jobs.running("chat", thread_id):
+        raise HTTPException(409, "an answer is still being written in this chat")
+    return EventSourceResponse(jobs.follow(jobs.start("chat", thread_id, events)))

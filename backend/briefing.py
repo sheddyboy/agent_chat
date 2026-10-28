@@ -1,12 +1,16 @@
 import logging
 import re
 import uuid
+from collections.abc import AsyncIterator
 from datetime import datetime
 from email.utils import parseaddr
 from pathlib import Path
 
 from config import settings
-from db import home_place, set_title, touch_thread
+from db import delete_thread, get_briefing, home_place, save_briefing, set_title, touch_thread
+from events import event
+from starlette.concurrency import run_in_threadpool
+from tracing import tracer
 from integrations.google_auth import has_scope
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
@@ -20,6 +24,8 @@ PICKS_MAX = 6  # the prompt asks for at most 6; a small model sometimes gives mo
 SNIPPET = 80
 # From this hour the briefing also looks at tomorrow
 EVENING = 17
+# save_as_thread writes 4 messages: the ask, the tool call, the data and the briefing
+BRIEFING_MESSAGES = 4
 
 # Events and weather are shown from the data, so the model only writes what needs judgment
 PROMPT = """You write the user's daily briefing from the data they send. Reply with exactly these two markdown sections:
@@ -211,3 +217,39 @@ async def save_as_thread(graph, data: str, text: str) -> str:
     touch_thread(thread_id, title)
     set_title(thread_id, title)
     return thread_id
+
+
+def today_key() -> str:
+    return f"{datetime.now():%Y-%m-%d}"
+
+
+def shown(row: dict) -> dict:
+    return render(row["day"], row["created_at"], row["thread_id"], row["data"], row["text"])
+
+
+async def run(graph) -> AsyncIterator[dict]:
+    """Write today's briefing as events (stages, then the briefing); it replaces an earlier one.
+
+    Runs as a job, so it finishes and is saved even when no page is watching.
+    """
+    with tracer.start_as_current_span("briefing", openinference_span_kind="chain") as span:
+        yield event("stage", stage="gathering")
+        # Google and Ollama calls block, so they run off the event loop
+        data = await run_in_threadpool(collect)
+        text_in = as_text(data)
+        span.set_input(text_in)
+        yield event("stage", stage="writing")
+        text = await run_in_threadpool(write_briefing, text_in)
+        span.set_output(text)
+    thread_id = await save_as_thread(graph, text_in, text)
+    day = today_key()
+    replaced = get_briefing(day)
+    save_briefing(day, thread_id, data, text)
+    # A regenerated briefing's old chat goes too, unless it holds follow-up questions
+    if replaced:
+        state = await graph.aget_state({"configurable": {"thread_id": replaced["thread_id"]}})
+        if len(state.values.get("messages", [])) <= BRIEFING_MESSAGES:
+            await graph.checkpointer.adelete_thread(replaced["thread_id"])
+            delete_thread(replaced["thread_id"])
+    yield event("briefing", briefing=shown(get_briefing(day)))
+    yield event("done")

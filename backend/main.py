@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 import tracing  # noqa: F401  registers Phoenix before any route runs
@@ -7,7 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from routes import briefing, catalog, chat, documents, images, overview, resume, threads, voice, weather
+import scheduler
+from routes import briefing, catalog, chat, documents, images, jobs, overview, resume, threads, voice, weather
 from tools import ALL_TOOLS
 from tools.mcp_loader import load_mcp_tools
 
@@ -20,7 +22,10 @@ async def lifespan(app: FastAPI):
     async with AsyncSqliteSaver.from_conn_string(settings.db_path) as saver:
         # Routes read it from request.app.state.graph
         app.state.graph = build_graph(saver)
+        # The scheduled morning briefing, checked once a minute
+        tick = asyncio.create_task(scheduler.loop(app.state.graph))
         yield
+        tick.cancel()
 
 
 # FastAPI traces every request by default; we only want the LLM spans in Phoenix
@@ -33,5 +38,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (chat, threads, documents, images, catalog, voice, briefing, overview, resume, weather):
+for module in (chat, threads, documents, images, catalog, voice, briefing, overview, resume, weather, jobs):
     app.include_router(module.router)

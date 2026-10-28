@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import jobs
 from config import settings
 from db import get_document, list_documents
 from events import event
@@ -36,7 +37,10 @@ async def upload_document(file: UploadFile):
     path = Path(settings.upload_dir) / make_doc_id(data) / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
-    return EventSourceResponse(stream_ingest(path, name))
+    # A job, so ingestion finishes even if the page closes; the same file twice joins one job
+    doc_id = make_doc_id(data)
+    job_id = jobs.running("ingest", doc_id) or jobs.start("ingest", doc_id, stream_ingest(path, name))
+    return EventSourceResponse(jobs.follow(job_id))
 
 
 @router.get("")

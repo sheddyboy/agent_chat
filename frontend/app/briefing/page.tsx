@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, CalendarDays, Mail, Menu, RefreshCw, Sparkles } from "lucide-react";
+import { AlertCircle, CalendarDays, Menu, RefreshCw, Sparkles } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 import { Day, HeadsUp, MailPicks, Weather } from "@/components/briefing/cards";
@@ -9,14 +9,14 @@ import { FollowUp } from "@/components/briefing/follow-up";
 import { useNow } from "@/components/overview/timeline";
 import { WeatherWidget } from "@/components/overview/weather";
 import type { Briefing } from "@/components/briefing/types";
+import { followJob, streamEvents, type ChatEvent } from "@/lib/sse";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-// Shown in turn while the briefing is written; the request itself takes 15 to 45 s
+// The briefing job reports these stages as it goes; it takes 15 to 45 s in all
 const STAGES = [
-  { icon: CalendarDays, text: "Checking your calendar" },
-  { icon: Mail, text: "Reading your mail" },
-  { icon: Sparkles, text: "Writing your briefing" },
+  { key: "gathering", icon: CalendarDays, text: "Checking your calendar, mail and weather" },
+  { key: "writing", icon: Sparkles, text: "Writing your briefing" },
 ];
 
 const localDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -43,30 +43,56 @@ export default function BriefingPage() {
       .then(setPast);
   }, []);
 
-  const generate = useCallback(async () => {
-    setStatus("generating");
-    setStage(0);
-    try {
-      const r = await fetch(`${API}/briefing`, { method: "POST" });
-      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-      setBriefing(await r.json());
-      setDay("today");
-      setStatus("ready");
-      loadPast();
-    } catch (e) {
-      setError((e as Error).message);
-      setStatus("error");
-    }
-  }, [loadPast]);
+  // Events from the briefing job: its stages, then the briefing. The job carries on
+  // without this page, so leaving and coming back joins the same one.
+  const onJobEvent = useCallback(
+    (ev: ChatEvent) => {
+      if (ev.type === "stage") setStage(Math.max(0, STAGES.findIndex((s) => s.key === ev.stage)));
+      if (ev.type === "briefing") {
+        setBriefing(ev.briefing as Briefing);
+        setDay("today");
+        setStatus("ready");
+        loadPast();
+      }
+      if (ev.type === "error") {
+        setError(ev.message as string);
+        setStatus("error");
+      }
+    },
+    [loadPast],
+  );
 
-  // Today with none yet is written straight away; a past day just shows what was kept
+  const watch = useCallback(
+    async (run: () => Promise<void>) => {
+      setStatus("generating");
+      setStage(0);
+      try {
+        await run();
+      } catch (e) {
+        setError((e as Error).message);
+        setStatus("error");
+      }
+    },
+    [],
+  );
+
+  const generate = useCallback(() => watch(() => streamEvents(`${API}/briefing`, {}, onJobEvent)), [watch, onJobEvent]);
+
+  // Today with none yet is written straight away (or the one being written is joined);
+  // a past day just shows what was kept
   useEffect(() => {
     let live = true;
     fetch(`${API}/briefing/${day}`).then(async (r) => {
       if (!live) return;
-      if (r.ok) {
-        setBriefing(await r.json());
+      if (r.status === 202) {
+        const { job_id } = await r.json();
+        watch(() => followJob(job_id, onJobEvent));
+      } else if (r.ok) {
+        const b = await r.json();
+        setBriefing(b);
         setStatus("ready");
+        // A regenerate still running from earlier: show its progress
+        if (b.job_id) watch(() => followJob(b.job_id, onJobEvent));
       } else if (r.status === 404 && day === "today") generate();
       else {
         setError(`${r.status} ${r.statusText}`);
@@ -76,16 +102,9 @@ export default function BriefingPage() {
     return () => {
       live = false;
     };
-  }, [day, generate]);
+  }, [day, generate, watch, onJobEvent]);
 
   useEffect(loadPast, [loadPast]);
-
-  // Step through the stages while generating, staying on the last one
-  useEffect(() => {
-    if (status !== "generating") return;
-    const timer = setInterval(() => setStage((s) => Math.min(s + 1, STAGES.length - 1)), 4000);
-    return () => clearInterval(timer);
-  }, [status]);
 
   function ask(q: string) {
     setQuestion(q);
@@ -176,7 +195,7 @@ export default function BriefingPage() {
                       </li>
                     ))}
                   </ol>
-                  <p className="text-xs text-muted-foreground">This takes about half a minute.</p>
+                  <p className="text-xs text-muted-foreground">This takes about half a minute. You can leave; it keeps going.</p>
                 </div>
               )}
 

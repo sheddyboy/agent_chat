@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, FileText, Loader2, Menu, MessageSquarePlus, Upload } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
+import { followJob, runningJob } from "@/lib/sse";
 import { uploadDocument } from "@/lib/upload";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -49,9 +50,31 @@ export default function Documents() {
 
   useEffect(loadLibrary, []);
 
+
   function update(name: string, change: Partial<Upload>) {
     setUploads((prev) => prev.map((u) => (u.name === name ? { ...u, ...change } : u)));
   }
+
+  // Ingestion runs as a job, so an upload started before you left may still be going:
+  // follow it here, with the same progress bar as a fresh upload
+  const following = useRef(new Set<string>());
+  useEffect(() => {
+    for (const d of docs ?? []) {
+      if (d.status !== "ingesting" || following.current.has(d.doc_id)) continue;
+      following.current.add(d.doc_id);
+      runningJob("ingest", d.doc_id).then((jobId) => {
+        if (!jobId) return;
+        setUploads((prev) => [{ name: d.name, docId: d.doc_id, done: 0, total: 0 }, ...prev.filter((u) => u.name !== d.name)]);
+        followJob(jobId, (ev) => {
+          if (ev.type === "ingestion") update(d.name, { stage: ev.stage as string, done: ev.done as number, total: ev.total as number });
+          if (ev.type === "error") update(d.name, { error: ev.message as string });
+        }).then(() => {
+          setUploads((prev) => prev.filter((u) => u.name !== d.name || u.error));
+          loadLibrary();
+        });
+      });
+    }
+  }, [docs]);
 
   async function upload(file: File) {
     setUploads((prev) => [{ name: file.name, done: 0, total: 0 }, ...prev.filter((u) => u.name !== file.name)]);

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Loader2, MessageSquare, Wrench } from "lucide-react";
 import { Streamdown } from "streamdown";
-import { streamEvents } from "@/lib/sse";
+import { followJob, runningJob, streamEvents, type ChatEvent } from "@/lib/sse";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -26,19 +26,35 @@ export function FollowUp({
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
-  // Earlier follow-ups come back with the thread; its first turn is the briefing itself
+  // Earlier follow-ups come back with the thread; its first turn is the briefing itself.
+  // One still being answered (the page was left mid-answer) is followed again from the start.
   useEffect(() => {
-    fetch(`${API}/threads/${threadId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { messages: ThreadMessage[] } | null) => {
-        const rest = d?.messages.slice(2) ?? [];
-        const past: Turn[] = [];
-        for (let i = 0; i + 1 < rest.length; i += 2) {
-          const tools = (rest[i + 1].events ?? []).filter((e) => e.type === "tool_start").map((e) => e.name ?? "");
-          past.push({ q: rest[i].content, a: rest[i + 1].content, tools });
-        }
-        setTurns(past);
+    let live = true;
+    Promise.all([
+      fetch(`${API}/threads/${threadId}`).then((r) => (r.ok ? r.json() : null)),
+      runningJob("chat", threadId),
+    ]).then(([d, jobId]: [{ messages: ThreadMessage[] } | null, string | null]) => {
+      if (!live) return;
+      const rest = d?.messages.slice(2) ?? [];
+      const asks = rest.flatMap((m, i) => (m.role === "user" ? [i] : []));
+      const past: Turn[] = asks.map((at, n) => {
+        const answer = rest.slice(at + 1, asks[n + 1] ?? rest.length).filter((m) => m.role === "assistant");
+        const tools = answer.flatMap((m) => (m.events ?? []).filter((e) => e.type === "tool_start").map((e) => e.name ?? ""));
+        return { q: rest[at].content, a: answer.map((m) => m.content).join(""), tools };
       });
+      if (jobId && past.length) {
+        // The last question is the one in progress: its answer is rebuilt from the job
+        past[past.length - 1] = { ...past[past.length - 1], a: "", tools: [] };
+        setTurns(past);
+        setBusy(true);
+        followJob(jobId, onStreamEvent).finally(() => setBusy(false));
+      } else setTurns(past);
+    });
+    return () => {
+      live = false;
+    };
+    // onStreamEvent only updates state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
 
   // A question handed over by a card's Ask button lands here, ready to send
@@ -50,6 +66,13 @@ export function FollowUp({
     setTurns((prev) => [...prev.slice(0, -1), change(prev[prev.length - 1])]);
   }
 
+  function onStreamEvent(ev: ChatEvent) {
+    if (ev.type === "token") update((t) => ({ ...t, a: t.a + (ev.text as string) }));
+    if (ev.type === "tool_start") update((t) => ({ ...t, tools: [...t.tools, ev.name as string] }));
+    if (ev.type === "interrupt") update((t) => ({ ...t, paused: true }));
+    if (ev.type === "error") update((t) => ({ ...t, error: ev.message as string }));
+  }
+
   async function send() {
     const q = question.trim();
     if (!q || busy) return;
@@ -57,12 +80,7 @@ export function FollowUp({
     setBusy(true);
     setTurns((prev) => [...prev, { q, a: "", tools: [] }]);
     try {
-      await streamEvents(`${API}/chat`, { message: q, thread_id: threadId }, (ev) => {
-        if (ev.type === "token") update((t) => ({ ...t, a: t.a + (ev.text as string) }));
-        if (ev.type === "tool_start") update((t) => ({ ...t, tools: [...t.tools, ev.name as string] }));
-        if (ev.type === "interrupt") update((t) => ({ ...t, paused: true }));
-        if (ev.type === "error") update((t) => ({ ...t, error: ev.message as string }));
-      });
+      await streamEvents(`${API}/chat`, { message: q, thread_id: threadId }, onStreamEvent);
     } catch (e) {
       update((t) => ({ ...t, error: (e as Error).message }));
     }

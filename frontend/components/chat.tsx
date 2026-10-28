@@ -32,7 +32,7 @@ import { Steps } from "@/components/steps";
 import { ToolPicker, type Tool } from "@/components/tool-picker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { streamEvents, type ChatEvent } from "@/lib/sse";
+import { followJob, runningJob, streamEvents, type ChatEvent } from "@/lib/sse";
 import { IMAGE_TYPES, uploadDocument, uploadImage } from "@/lib/upload";
 import { speak } from "@/lib/voice";
 
@@ -138,13 +138,29 @@ export function Chat() {
     if (opening.current !== id) return; // the user opened another chat meanwhile
     if (!res.ok) return setStatus("missing");
     const d = await res.json();
-    setMessages(d.messages);
+    const jobId = await runningJob("chat", id);
+    if (opening.current !== id) return;
+    // An answer still being written (the page was closed or reloaded mid-turn): show the
+    // history up to that question, then replay the job into a fresh answer
+    const lastAsk = (d.messages as Message[]).findLastIndex((m) => m.role === "user");
+    setMessages(
+      jobId
+        ? [...d.messages.slice(0, lastAsk + 1), { role: "assistant", content: "", events: [], startedAt: Date.now() }]
+        : d.messages,
+    );
     setThreadId(id);
     setTitle(d.title);
     if (d.model) setModel(d.model);
     setEnabledTools(d.enabled_tools);
     setThink(d.think);
     setStatus("ready");
+    if (jobId) {
+      setStreaming(true);
+      await followJob(jobId, onEvent).catch(() => {});
+      setStreaming(false);
+      // The saved history is the full turn, including any part from before an approval
+      if (opening.current === id) openThread(id);
+    }
   }
 
   function reset() {
@@ -165,8 +181,8 @@ export function Chat() {
     // Equal right after our own replaceState below: the open chat just got its URL
     if (urlId === threadId) return;
     // The URL lives outside React, so syncing to it is what this effect is for
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (urlId) openThread(urlId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     else reset();
     // Only a URL change should open or reset a chat
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,6 +219,9 @@ export function Chat() {
   }
 
   function onEvent(ev: ChatEvent) {
+    // The turn runs as a job; its first event names the thread, so a new chat gets its URL
+    // straight away and a reload mid-answer can find the job again
+    if (ev.type === "job") return setThreadId(ev.ref as string);
     if (ev.type === "token") {
       const now = Date.now();
       return updateLast((m) => ({
