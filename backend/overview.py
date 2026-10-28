@@ -6,9 +6,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
-from briefing import MAIL_QUERY, WEATHER
+from briefing import MAIL_QUERY
 from config import settings
-from db import list_documents
+from db import home_place, list_documents
 from integrations.google_auth import has_scope
 
 INBOX_ROWS = 5
@@ -55,40 +55,26 @@ def inbox() -> dict:
 
 
 def weather() -> dict:
-    if settings.weather_lat is None:
+    """Home's forecast, in the compact shape the Overview card and the briefing use."""
+    import weather as forecasts
+
+    place = home_place()
+    if not place:
         return {"connected": False}
-    resp = httpx.get(
-        "https://api.open-meteo.com/v1/forecast",
-        params={
-            "latitude": settings.weather_lat,
-            "longitude": settings.weather_lon,
-            "current": "temperature_2m,weather_code",
-            "hourly": "temperature_2m",
-            "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
-            "timezone": "auto",
-            "forecast_days": 2,
-        },
-        timeout=10,
-    )
-    resp.raise_for_status()
-    d = resp.json()
-    now = d["current"]
-    # Hourly times are local and on the hour, so the current hour is where the strip starts
-    hour = now["time"][:13] + ":00"
-    times = d["hourly"]["time"]
-    first = times.index(hour) if hour in times else 0
+    f = forecasts.forecast(place["lat"], place["lon"])
+    today = f["daily"][0]
     return {
         "connected": True,
-        "temp": now["temperature_2m"],
-        "code": now["weather_code"],
-        "sky": WEATHER.get(now["weather_code"], "mixed"),
-        "min": d["daily"]["temperature_2m_min"][0],
-        "max": d["daily"]["temperature_2m_max"][0],
-        "rain": d["daily"]["precipitation_probability_max"][0],
-        "hourly": [
-            {"time": t[11:16], "temp": v}
-            for t, v in zip(times[first : first + HOURS], d["hourly"]["temperature_2m"][first : first + HOURS])
-        ],
+        "place": place["name"],
+        "temp": f["current"]["temp"],
+        "code": f["current"]["code"],
+        "sky": f["current"]["sky"],
+        "min": today["min"],
+        "max": today["max"],
+        "rain": today["rain"],
+        "summary": f["summary"],
+        "alert": f["alert"],
+        "hourly": [{"time": h["time"][11:16], "temp": h["temp"], "code": h["code"], "rain": h["rain"]} for h in f["hourly"][:HOURS]],
     }
 
 
