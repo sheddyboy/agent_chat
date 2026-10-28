@@ -8,7 +8,8 @@ from urllib.parse import urlparse
 import httpx
 from briefing import MAIL_QUERY
 from core.config import settings
-from core.db import home_place, list_documents
+from core.db import list_documents
+from weather.places import home_place
 from integrations.google_auth import has_scope
 
 INBOX_ROWS = 5
@@ -56,12 +57,12 @@ def inbox() -> dict:
 
 def weather() -> dict:
     """Home's forecast, in the compact shape the Overview card and the briefing use."""
-    import weather as forecasts
+    from weather import openmeteo
 
     place = home_place()
     if not place:
         return {"connected": False}
-    f = forecasts.forecast(place["lat"], place["lon"])
+    f = openmeteo.forecast(place["lat"], place["lon"])
     today = f["daily"][0]
     return {
         "connected": True,

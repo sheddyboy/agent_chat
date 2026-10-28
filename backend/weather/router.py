@@ -1,5 +1,5 @@
-import weather
-from core.db import add_place, delete_place, get_place, home_place, list_places, set_home
+from weather import openmeteo
+from weather.places import add_place, delete_place, get_place, home_place, list_places, set_home
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
@@ -17,7 +17,7 @@ class NewPlace(BaseModel):
 
 async def for_place(place: dict) -> dict:
     try:
-        data = await run_in_threadpool(weather.forecast, place["lat"], place["lon"])
+        data = await run_in_threadpool(openmeteo.forecast, place["lat"], place["lon"])
     except Exception as e:
         raise HTTPException(502, f"forecast unavailable ({type(e).__name__})")
     return {**data, "place": place}
@@ -50,7 +50,7 @@ async def search(q: str):
     if len(q.strip()) < 2:
         return []
     try:
-        return await run_in_threadpool(weather.search, q.strip())
+        return await run_in_threadpool(openmeteo.search, q.strip())
     except Exception as e:
         raise HTTPException(502, f"search unavailable ({type(e).__name__})")
 

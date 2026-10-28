@@ -9,19 +9,21 @@ from images.router import router as images_router
 from jobs.router import router as jobs_router
 from resume.router import router as resume_router
 from voice.router import router as voice_router
+from weather import places
+from weather.router import router as weather_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import scheduler
-from routes import briefing, catalog, chat, documents, overview, threads, weather
+from routes import briefing, catalog, chat, documents, overview, threads
 from tools import ALL_TOOLS
 from tools.mcp_loader import load_mcp_tools
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db(jobs_store.init)
+    init_db(jobs_store.init, places.init)
     # MCP tools join ALL_TOOLS before the graph builds its ToolNode
     ALL_TOOLS.extend(await load_mcp_tools())
     async with AsyncSqliteSaver.from_conn_string(settings.db_path) as saver:
@@ -53,7 +55,7 @@ ROUTERS = (
     briefing.router,
     overview.router,
     resume_router,
-    weather.router,
+    weather_router,
     jobs_router,
 )
 for router in ROUTERS:

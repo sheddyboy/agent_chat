@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
-import weather
-from core.db import home_place
+from weather import openmeteo
+from weather.places import home_place
 from langchain_core.tools import tool
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
@@ -33,7 +33,7 @@ def get_weather(place: str = "", day: str = "") -> str:
     day: "today", "tomorrow", a weekday like "saturday", or a date like "2026-11-02"; empty means now and today.
     """
     if place.strip():
-        matches = weather.search(place.strip())
+        matches = openmeteo.search(place.strip())
         if not matches:
             return f'No place called "{place}" found.'
         spot = matches[0]
@@ -43,11 +43,11 @@ def get_weather(place: str = "", day: str = "") -> str:
         if not spot:
             return "No Home place is set. Ask the user to add one on the Weather page, or give a place."
         name = spot["name"]
-    f = weather.forecast(spot["lat"], spot["lon"])
+    f = openmeteo.forecast(spot["lat"], spot["lon"])
     chosen = pick_day(day, f["daily"])
     if chosen is None:
         return f'"{day}" is not within the 7-day forecast for {name}.'
-    sky = weather.CODES.get(chosen["code"], "mixed")
+    sky = openmeteo.CODES.get(chosen["code"], "mixed")
     lines = [
         f"{name}, {chosen['date']}: {sky}, {chosen['min']:.0f} to {chosen['max']:.0f} °C, "
         f"{chosen['rain']}% chance of rain, sunrise {chosen['sunrise'][11:16]}, sunset {chosen['sunset'][11:16]}."

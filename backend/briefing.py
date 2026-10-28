@@ -7,7 +7,8 @@ from email.utils import parseaddr
 from pathlib import Path
 
 from core.config import settings
-from core.db import delete_thread, get_briefing, home_place, save_briefing, set_title, touch_thread
+from core.db import delete_thread, get_briefing, save_briefing, set_title, touch_thread
+from weather.places import home_place
 from core.events import event
 from starlette.concurrency import run_in_threadpool
 from core.tracing import tracer

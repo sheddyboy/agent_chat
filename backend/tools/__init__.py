@@ -9,7 +9,7 @@ from tools.datetime_tool import get_datetime
 from images.tool import generate_image
 from tools.save_note import save_note
 from tools.search_documents import search_documents
-from tools.weather import get_weather
+from weather.tool import get_weather
 
 ALL_TOOLS = [get_datetime, calculator, search_documents, save_note, generate_image, get_weather]
 
