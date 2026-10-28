@@ -1,6 +1,6 @@
 import logging
 
-import overview
+from overview import widgets
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
 
@@ -20,19 +20,19 @@ async def run(widget):
 
 @router.get("/schedule")
 async def schedule():
-    return await run(overview.schedule)
+    return await run(widgets.schedule)
 
 
 @router.get("/inbox")
 async def inbox():
-    return await run(overview.inbox)
+    return await run(widgets.inbox)
 
 
 @router.get("/weather")
 async def weather():
-    return await run(overview.weather)
+    return await run(widgets.weather)
 
 
 @router.get("/status")
 async def status():
-    return await run(overview.status)
+    return await run(widgets.status)

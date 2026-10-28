@@ -6,7 +6,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
-from briefing import MAIL_QUERY
 from core.config import settings
 from documents.store import list_documents
 from weather.places import home_place
@@ -47,7 +46,7 @@ def inbox() -> dict:
     from integrations import gmail
 
     label = gmail.service().users().labels().get(userId="me", id="INBOX").execute()
-    rows, _ = gmail.search("7d", MAIL_QUERY, True, INBOX_ROWS)
+    rows, _ = gmail.search("7d", gmail.MAIL_QUERY, True, INBOX_ROWS)
     mails = []
     for r in rows:
         name, address = parseaddr(r["from"])

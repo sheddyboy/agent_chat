@@ -10,6 +10,7 @@ from core.config import settings
 from core.db import get_briefing, save_briefing
 from threads.store import delete_thread, set_title, touch_thread
 from weather.places import home_place
+from overview import widgets
 from core.events import event
 from starlette.concurrency import run_in_threadpool
 from core.tracing import tracer
@@ -19,8 +20,6 @@ from langchain_ollama import ChatOllama
 
 logger = logging.getLogger(__name__)
 
-# Marketing and social mail would crowd out the few that matter in an 8K context
-MAIL_QUERY = "-category:promotions -category:social"
 MAIL_MAX = 30
 PICKS_MAX = 6  # the prompt asks for at most 6; a small model sometimes gives more
 SNIPPET = 80
@@ -51,24 +50,21 @@ MAIL_LINE = re.compile(r"^[\s*-]*[`\[]?(\d{1,2}|[0-9a-f]{12,})[`\]]?\s*\|\s*(.+)
 
 
 def today() -> dict:
-    import overview
-
-    data = overview.schedule()
+    data = widgets.schedule()
     return {"events": data["events"], "free": data["free"]}
 
 
 def tomorrow() -> dict:
-    import overview
     from integrations import google_calendar
 
     rows, _ = google_calendar.list_events("tomorrow")
-    return {"events": [overview.event(r) for r in rows]}
+    return {"events": [widgets.event(r) for r in rows]}
 
 
 def mail() -> dict:
     from integrations import gmail
 
-    rows, more = gmail.search("24h", MAIL_QUERY, False, MAIL_MAX)
+    rows, more = gmail.search("24h", gmail.MAIL_QUERY, False, MAIL_MAX)
     mails = []
     for r in rows:
         name, address = parseaddr(r["from"])
@@ -80,9 +76,7 @@ def mail() -> dict:
 
 
 def weather() -> dict:
-    import overview
-
-    return overview.weather()
+    return widgets.weather()
 
 
 def collect() -> dict:

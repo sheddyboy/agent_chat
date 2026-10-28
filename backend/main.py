@@ -9,6 +9,7 @@ from documents.router import router as documents_router
 from jobs import store as jobs_store
 from images.router import router as images_router
 from jobs.router import router as jobs_router
+from overview.router import router as overview_router
 from resume.router import router as resume_router
 from threads import store as threads_store
 from threads.router import router as threads_router
@@ -20,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import scheduler
-from routes import briefing, catalog, chat, overview
+from routes import briefing, catalog, chat
 from tools import ALL_TOOLS
 from tools.mcp_loader import load_mcp_tools
 
@@ -57,7 +58,7 @@ ROUTERS = (
     catalog.router,
     voice_router,
     briefing.router,
-    overview.router,
+    overview_router,
     resume_router,
     weather_router,
     jobs_router,
