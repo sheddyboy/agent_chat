@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { FileText, FileUser, LayoutGrid, MessageSquare, PanelLeft, Plus, Sparkles, Sun, Trash2 } from "lucide-react";
+import { CloudSun, FileText, FileUser, LayoutGrid, MessageSquare, PanelLeft, Plus, Sparkles, Sun, Trash2 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -115,6 +115,10 @@ export function Sidebar({
         <Link href="/briefing" onClick={onClose} className={`${item} ${here("/briefing")}`}>
           <Sun className="size-4 shrink-0" />
           <span className={label}>Briefing</span>
+        </Link>
+        <Link href="/weather" onClick={onClose} className={`${item} ${here("/weather")}`}>
+          <CloudSun className="size-4 shrink-0" />
+          <span className={label}>Weather</span>
         </Link>
         <Link href="/documents" className={`${item} ${here("/documents")}`}>
           <FileText className="size-4 shrink-0" />

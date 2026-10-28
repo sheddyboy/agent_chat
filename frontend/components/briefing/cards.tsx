@@ -4,7 +4,7 @@ import { CalendarClock, CalendarDays, Mail, MessageCircleQuestion, Sparkles, Sun
 import { Streamdown } from "streamdown";
 import { Card, Empty } from "@/components/overview/card";
 import { Timeline } from "@/components/overview/timeline";
-import { SkyIcon } from "@/components/overview/weather";
+import { SkyIcon } from "@/components/weather/sky-icon";
 import type { Briefing } from "@/components/briefing/types";
 
 // What needs attention, written by the model
@@ -37,17 +37,18 @@ export function Day({
   );
 }
 
-export function Weather({ part, index }: { part: NonNullable<Briefing["weather"]>; index: number }) {
+// A past day's weather as it was when that briefing was written; today's uses the live card
+export function Weather({ part, asOf, index }: { part: NonNullable<Briefing["weather"]>; asOf: string; index: number }) {
   return (
-    <Card title="Weather" icon={Sun} index={index}>
+    <Card title={`Weather · as of ${asOf}`} icon={Sun} index={index}>
       {part.ok ? (
         <div className="flex items-center gap-4">
-          <SkyIcon code={part.code} className="size-10 shrink-0 stroke-[1.25] text-muted-foreground motion-safe:animate-[float_6s_ease-in-out_infinite]" />
+          <SkyIcon code={part.code} className="size-10 shrink-0 stroke-[1.25] text-muted-foreground" />
           <div>
-            <p className="text-sm capitalize">{part.sky}</p>
-            <p className="font-mono text-xs text-muted-foreground tabular-nums">
-              {Math.round(part.min)}° to {Math.round(part.max)}° · {part.rain}% rain
+            <p className="text-sm first-letter:uppercase">
+              {part.sky}, {Math.round(part.min)}° to {Math.round(part.max)}°
             </p>
+            <p className="text-xs text-muted-foreground">{part.summary ?? `${part.rain}% chance of rain`}</p>
           </div>
         </div>
       ) : (

@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     # The briefing's weather (Open-Meteo, no key); left unset, it skips the weather
     weather_lat: float | None = None
     weather_lon: float | None = None
+    # Name for that location; it becomes the Home place on first start
+    weather_place: str = "Home"
 
     # resume.tex, its compiled PDF and earlier versions; personal, so git ignores it
     resume_dir: str = "resume"
