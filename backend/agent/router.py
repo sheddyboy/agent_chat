@@ -1,7 +1,8 @@
 from core.config import settings
 from fastapi import APIRouter
-from agent.models import capabilities
 from tools import ALL_TOOLS, SENSITIVE_TOOLS
+
+from agent.models import capabilities
 
 # /models and /tools share no prefix, so this router has none
 router = APIRouter(tags=["catalog"])
