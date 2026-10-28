@@ -64,7 +64,7 @@ def summary(hourly: list[dict]) -> str:
     while end + 1 < len(wet) and wet[end + 1]:
         end += 1
     if end + 1 == len(wet):
-        return "Rain likely for the rest of the next 12 hours" if start == 0 else f"Rain likely from {hhmm(ahead[start]['time'])}"
+        return "Rain likely for the next 12 hours" if start == 0 else f"Rain likely from {hhmm(ahead[start]['time'])}"
     until = hhmm(ahead[end + 1]["time"])
     return f"Rain likely until {until}" if start == 0 else f"Rain likely {hhmm(ahead[start]['time'])} to {until}"
 

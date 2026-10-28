@@ -45,7 +45,7 @@ export function Weather({ part, asOf, index }: { part: NonNullable<Briefing["wea
         <div className="flex items-center gap-4">
           <SkyIcon code={part.code} className="size-10 shrink-0 stroke-[1.25] text-muted-foreground" />
           <div>
-            <p className="text-sm capitalize">
+            <p className="text-sm first-letter:uppercase">
               {part.sky}, {Math.round(part.min)}° to {Math.round(part.max)}°
             </p>
             <p className="text-xs text-muted-foreground">{part.summary ?? `${part.rain}% chance of rain`}</p>

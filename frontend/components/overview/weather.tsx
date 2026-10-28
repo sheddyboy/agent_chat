@@ -43,7 +43,7 @@ export function WeatherWidget({ index, className }: { index: number; className?:
         />
         <div className="min-w-0">
           <p className="font-mono text-4xl font-semibold tracking-tight tabular-nums">{Math.round(temp)}°</p>
-          <p className="truncate text-sm capitalize text-muted-foreground">
+          <p className="truncate text-sm text-muted-foreground first-letter:uppercase">
             {data.sky} · H {Math.round(data.max)}° L {Math.round(data.min)}°
           </p>
         </div>
