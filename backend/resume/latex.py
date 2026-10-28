@@ -9,7 +9,7 @@ from pathlib import Path
 
 from core.config import settings
 
-TEMPLATE = Path(__file__).parent / "resume_template.tex"
+TEMPLATE = Path(__file__).parent / "template.tex"
 COMPILE_TIMEOUT = 60
 # Overleaf runs pdfTeX; Tectonic runs XeTeX, which has no such commands. They are
 # commented out only for the compile, so the saved source still pastes into Overleaf.

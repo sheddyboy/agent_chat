@@ -1,4 +1,4 @@
-import resume
+from resume import latex
 from langchain_core.tools import tool
 
 
@@ -6,7 +6,7 @@ from langchain_core.tools import tool
 def read_resume() -> str:
     """Read the user's resume, a LaTeX file (Jake's Resume template). Call this before
     answering questions about the resume and before every edit_resume."""
-    return resume.source()
+    return latex.source()
 
 
 @tool
@@ -20,4 +20,4 @@ def edit_resume(find: str, replace: str) -> str:
     The resume is recompiled; if the new LaTeX does not compile, nothing is saved and
     the error is returned so you can fix the edit.
     """
-    return resume.edit(find, replace)
+    return latex.edit(find, replace)

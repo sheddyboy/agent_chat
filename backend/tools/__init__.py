@@ -45,6 +45,6 @@ if has_scope("calendar.readonly"):
 
 # The resume compiles with Tectonic (brew install tectonic)
 if shutil.which("tectonic"):
-    from tools.resume import edit_resume, read_resume
+    from resume.tool import edit_resume, read_resume
 
     ALL_TOOLS += [read_resume, edit_resume]

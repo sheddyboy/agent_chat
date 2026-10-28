@@ -6,13 +6,14 @@ from core.config import settings
 from core.db import init_db
 from jobs import store as jobs_store
 from jobs.router import router as jobs_router
+from resume.router import router as resume_router
 from voice.router import router as voice_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import scheduler
-from routes import briefing, catalog, chat, documents, images, overview, resume, threads, weather
+from routes import briefing, catalog, chat, documents, images, overview, threads, weather
 from tools import ALL_TOOLS
 from tools.mcp_loader import load_mcp_tools
 
@@ -50,7 +51,7 @@ ROUTERS = (
     voice_router,
     briefing.router,
     overview.router,
-    resume.router,
+    resume_router,
     weather.router,
     jobs_router,
 )
