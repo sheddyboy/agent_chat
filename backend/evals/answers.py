@@ -5,7 +5,7 @@ import string
 from functools import partial
 
 from core.config import settings
-from graph import build_graph
+from agent.graph import build_graph
 from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_ollama import ChatOllama
 from phoenix.client import Client

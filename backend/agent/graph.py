@@ -11,7 +11,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import Command, interrupt
-from models import capabilities
+from agent.models import capabilities
 from tools import ALL_TOOLS, SENSITIVE_TOOLS
 
 logger = logging.getLogger(__name__)

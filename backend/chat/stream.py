@@ -4,7 +4,7 @@ from threads.store import set_title
 from core.events import event
 from langchain_core.messages import AIMessageChunk
 from openinference.instrumentation import using_session
-from titles import make_title
+from chat.titles import make_title
 
 
 async def stream_graph(graph, input, thread_id: str, span, first_message: str | None = None):
