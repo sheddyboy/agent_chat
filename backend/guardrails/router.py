@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from guardrails.check import run
 from guardrails.classify import classify
+from guardrails.pii import redact
 from guardrails.policy import GUARDS, INPUT
 
 router = APIRouter(prefix="/guardrails", tags=["guardrails"])
@@ -46,4 +47,5 @@ def check(req: CheckRequest):
                 "ms": round((time.perf_counter() - start) * 1000),
             }
         )
-    return {"findings": findings, "models": models}
+    spans = [s for f in findings if f["flagged"] and f["action"] == "redact" for s in f["spans"]]
+    return {"findings": findings, "models": models, "redacted": redact(req.text, spans)}
