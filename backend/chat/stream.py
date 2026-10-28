@@ -19,6 +19,7 @@ async def stream_graph(graph, input, thread_id: str, span, first_message: str | 
     # After a resume the tool_start happened in an earlier request
     stream_start = time.monotonic()
     answer = ""
+    blocked = False
     try:
         # Root span is already open, so this tags the LLM and tool spans under it
         with using_session(thread_id):
@@ -33,6 +34,7 @@ async def stream_graph(graph, input, thread_id: str, span, first_message: str | 
                         yield event("node_start", node=chunk["name"])
                 elif mode == "custom":
                     # Tools emit fully formed events via get_stream_writer()
+                    blocked = blocked or (chunk.get("type") == "guard" and chunk.get("blocked"))
                     yield event(**chunk)
                 elif mode == "messages":
                     msg, _meta = chunk
@@ -77,7 +79,11 @@ async def stream_graph(graph, input, thread_id: str, span, first_message: str | 
         yield event("error", message=str(e))
     span.set_output(answer)
     # Before done, which the frontend expects to be last (an interrupt sits right before it)
-    if first_message and (title := await make_title(first_message)):
+    if first_message and blocked:
+        # The title model must not read it, and the placeholder title would echo it
+        set_title(thread_id, "Blocked message")
+        yield event("title", title="Blocked message", thread_id=thread_id)
+    elif first_message and (title := await make_title(first_message)):
         set_title(thread_id, title)
         yield event("title", title=title, thread_id=thread_id)
     yield event("done", trace_id=trace_id, thread_id=thread_id)
