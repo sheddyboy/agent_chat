@@ -4,8 +4,8 @@ from core.config import settings
 from langchain_core.tools import tool
 from langgraph.config import get_stream_writer
 from langgraph.prebuilt import InjectedState
-from retrieval.hybrid import hybrid_search
-from retrieval.rerank import rerank
+from documents.retrieval.hybrid import hybrid_search
+from documents.retrieval.rerank import rerank
 
 
 @tool(response_format="content_and_artifact")

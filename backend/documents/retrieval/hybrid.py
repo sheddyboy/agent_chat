@@ -1,4 +1,4 @@
-from ingestion.store import vector_store
+from documents.ingestion.store import vector_store
 from langchain_core.documents import Document
 from qdrant_client import models
 

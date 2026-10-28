@@ -3,12 +3,14 @@ import hashlib
 import uuid
 from pathlib import Path
 
-from core.db import set_document_status, upsert_document
 from core.events import event
+from core.tracing import tracer
 
-from ingestion.chunking import chunk_pages
-from ingestion.loader import load_pages
-from ingestion.store import count, vector_store
+from documents.store import set_document_status, upsert_document
+
+from documents.ingestion.chunking import chunk_pages
+from documents.ingestion.loader import load_pages
+from documents.ingestion.store import count, vector_store
 
 BATCH = 32
 
@@ -28,6 +30,21 @@ async def ingest(path: str, doc_name: str):
     except Exception as e:
         set_document_status(doc_id, "failed", error=str(e))
         raise
+
+
+async def stream_ingest(path: Path, doc_name: str):
+    with tracer.start_as_current_span(
+        "ingest", openinference_span_kind="chain"
+    ) as span:
+        span.set_input(doc_name)
+        trace_id = format(span.get_span_context().trace_id, "032x")
+        try:
+            async for ev in ingest(str(path), doc_name):
+                yield ev
+        except Exception as e:
+            span.record_exception(e)
+            yield event("error", message=str(e))
+        yield event("done", trace_id=trace_id)
 
 
 async def run_stages(path: str, doc_id: str, doc_name: str):

@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import httpx
 from briefing import MAIL_QUERY
 from core.config import settings
-from core.db import list_documents
+from documents.store import list_documents
 from weather.places import home_place
 from integrations.google_auth import has_scope
 

@@ -2,29 +2,12 @@ from pathlib import Path
 
 from jobs import runner
 from core.config import settings
-from core.db import get_document, list_documents
-from core.events import event
+from documents.store import get_document, list_documents
 from fastapi import APIRouter, HTTPException, UploadFile
-from ingestion.pipeline import ingest, make_doc_id
+from documents.ingestion.pipeline import make_doc_id, stream_ingest
 from sse_starlette.sse import EventSourceResponse
-from core.tracing import tracer
 
 router = APIRouter(prefix="/documents", tags=["documents"])
-
-
-async def stream_ingest(path: Path, doc_name: str):
-    with tracer.start_as_current_span(
-        "ingest", openinference_span_kind="chain"
-    ) as span:
-        span.set_input(doc_name)
-        trace_id = format(span.get_span_context().trace_id, "032x")
-        try:
-            async for ev in ingest(str(path), doc_name):
-                yield ev
-        except Exception as e:
-            span.record_exception(e)
-            yield event("error", message=str(e))
-        yield event("done", trace_id=trace_id)
 
 
 @router.post("")

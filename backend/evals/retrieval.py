@@ -3,8 +3,8 @@
 from core.config import settings
 from phoenix.client import Client
 from phoenix.client.experiments import run_experiment
-from retrieval.hybrid import hybrid_search
-from retrieval.rerank import rerank
+from documents.retrieval.hybrid import hybrid_search
+from documents.retrieval.rerank import rerank
 
 from evals.hotpot import DATASET
 
