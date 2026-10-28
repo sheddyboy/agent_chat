@@ -3,7 +3,7 @@ from typing import Annotated, TypedDict
 
 from core.config import settings
 from core.guard import injection_score
-from images import image_block, image_path
+from images.store import image_block, image_path
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
 from langgraph.config import get_stream_writer

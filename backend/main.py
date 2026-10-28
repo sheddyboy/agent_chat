@@ -5,6 +5,7 @@ import core.tracing  # noqa: F401  registers Phoenix before any route runs
 from core.config import settings
 from core.db import init_db
 from jobs import store as jobs_store
+from images.router import router as images_router
 from jobs.router import router as jobs_router
 from resume.router import router as resume_router
 from voice.router import router as voice_router
@@ -13,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import scheduler
-from routes import briefing, catalog, chat, documents, images, overview, threads, weather
+from routes import briefing, catalog, chat, documents, overview, threads, weather
 from tools import ALL_TOOLS
 from tools.mcp_loader import load_mcp_tools
 
@@ -46,7 +47,7 @@ ROUTERS = (
     chat.router,
     threads.router,
     documents.router,
-    images.router,
+    images_router,
     catalog.router,
     voice_router,
     briefing.router,

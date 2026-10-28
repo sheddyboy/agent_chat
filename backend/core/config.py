@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     voice_dir: str = "data/voice_models"  # Kokoro files, downloaded on first /voice/speak
 
     image_model: str = "stabilityai/sdxl-turbo"  # about 7 GB, downloaded on first draw
-    image_vae: str = "madebyollin/sdxl-vae-fp16-fix"  # stays in fp16, see imagegen.py
+    image_vae: str = "madebyollin/sdxl-vae-fp16-fix"  # stays in fp16, see images/generate.py
     image_steps: int = 2  # 1 to 4 for Turbo; 2 took about 1 s on an M4 Pro
     image_unload_after_s: int = 300  # free the memory once drawing goes idle
 

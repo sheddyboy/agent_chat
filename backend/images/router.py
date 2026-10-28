@@ -3,7 +3,7 @@ from pathlib import Path
 from core.config import settings
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from images import IMAGE_TYPES, image_path, save_image
+from images.store import IMAGE_TYPES, image_path, save_image
 
 router = APIRouter(prefix="/images", tags=["images"])
 

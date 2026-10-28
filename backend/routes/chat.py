@@ -5,7 +5,7 @@ from jobs import runner
 from core.config import settings
 from core.db import get_document, get_thread, touch_thread
 from fastapi import APIRouter, HTTPException, Request
-from images import image_path
+from images.store import image_path
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 from pydantic import BaseModel

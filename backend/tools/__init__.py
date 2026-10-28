@@ -6,7 +6,7 @@ from integrations.google_auth import has_scope
 
 from tools.calculator import calculator
 from tools.datetime_tool import get_datetime
-from tools.generate_image import generate_image
+from images.tool import generate_image
 from tools.save_note import save_note
 from tools.search_documents import search_documents
 from tools.weather import get_weather
