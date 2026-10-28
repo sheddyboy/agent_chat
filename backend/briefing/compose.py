@@ -7,7 +7,7 @@ from email.utils import parseaddr
 from pathlib import Path
 
 from core.config import settings
-from core.db import get_briefing, save_briefing
+from briefing.store import get_briefing, save_briefing
 from threads.store import delete_thread, set_title, touch_thread
 from weather.places import home_place
 from overview import widgets

@@ -5,9 +5,9 @@ import logging
 from datetime import datetime
 
 from jobs import runner
-from briefing import run, today_key
+from briefing.compose import run, today_key
 from core.config import settings
-from core.db import get_briefing
+from briefing.store import get_briefing
 
 logger = logging.getLogger(__name__)
 

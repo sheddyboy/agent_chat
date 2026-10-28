@@ -3,6 +3,9 @@ from contextlib import asynccontextmanager
 
 import core.tracing  # noqa: F401  registers Phoenix before any route runs
 from core.config import settings
+from briefing import scheduler
+from briefing import store as briefing_store
+from briefing.router import router as briefing_router
 from core.db import init_db
 from documents import store as documents_store
 from documents.router import router as documents_router
@@ -20,15 +23,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-import scheduler
-from routes import briefing, catalog, chat
+from routes import catalog, chat
 from tools import ALL_TOOLS
 from tools.mcp_loader import load_mcp_tools
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db(threads_store.init, documents_store.init, places.init, jobs_store.init)
+    init_db(threads_store.init, documents_store.init, places.init, briefing_store.init, jobs_store.init)
     # MCP tools join ALL_TOOLS before the graph builds its ToolNode
     ALL_TOOLS.extend(await load_mcp_tools())
     async with AsyncSqliteSaver.from_conn_string(settings.db_path) as saver:
@@ -57,7 +59,7 @@ ROUTERS = (
     images_router,
     catalog.router,
     voice_router,
-    briefing.router,
+    briefing_router,
     overview_router,
     resume_router,
     weather_router,
