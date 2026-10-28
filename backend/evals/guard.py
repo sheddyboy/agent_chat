@@ -1,8 +1,8 @@
 """Guard suite: does the prompt-injection classifier block injections and let benign prompts through?"""
 
-from core.config import settings
 from datasets import load_dataset
-from core.guard import injection_score
+from guardrails.check import run
+from guardrails.policy import GUARDS
 from phoenix.client import Client
 from phoenix.client.experiments import run_experiment
 
@@ -26,8 +26,8 @@ def upload():
 
 
 def classify(input) -> dict:
-    score = injection_score(input["text"])
-    return {"score": round(score, 4), "blocked": score >= settings.guard_threshold}
+    finding = run("injection", input["text"])
+    return {"score": finding["score"], "blocked": finding["flagged"]}
 
 
 def correct(output, expected) -> float:
@@ -61,12 +61,15 @@ def threshold_table(dataset, experiment) -> None:
 
 def main() -> None:
     dataset = upload()
+    guard = GUARDS["injection"]
+    # "owner/name" -> "name", so swapped models get their own experiment names
+    model = guard["model"].split("/")[-1]
     experiment = run_experiment(
         dataset=dataset,
         task=classify,
         evaluators=[correct, missed_injection, false_block],
-        experiment_name=f"protectai-t{settings.guard_threshold}",
-        experiment_metadata={"model": settings.guard_model, "threshold": settings.guard_threshold},
+        experiment_name=f"{model}-t{guard['threshold']}",
+        experiment_metadata={"model": guard["model"], "threshold": guard["threshold"]},
     )
     print(mean_scores(experiment))
     threshold_table(dataset, experiment)
