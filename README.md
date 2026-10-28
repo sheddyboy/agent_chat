@@ -404,8 +404,11 @@ sequenceDiagram
   | `hate` | `facebook/roberta-hate-speech-dynabench-r4-target` | `hate` | 0.9 | block |
   | `threat` | `unitary/toxic-bert` | `threat` | 0.7 | block |
   | `toxicity` | `unitary/toxic-bert` | `insult`, `severe_toxic`, `identity_hate` | 0.7 | warn |
+  | `pii` | `iiiorg/piiranha-v1-detect-personal-information` + regex | card, account, social, tax, ID card and driver's license numbers, passwords | 0.8 | redact |
 
   toxic-bert's catch-all `toxic` label is left out: venting like "this damn bug" scores 0.87 on it. Its `identity_hate` gave a plain slur only 0.38, which is why hate has its own model. Real threats scored about 0.76 against 0.55 for "kill this bug", so the threat margin is narrow. Gmail's `safe()` runs only the `injection` guard on email subjects and snippets.
+- **PII** is a span guard ([pii.py](backend/guardrails/pii.py)): a token-classification model marks words, scanning long text in overlapping 512-token windows, and regex adds card numbers that pass the Luhn check and IBANs. Only numbers the assistant never needs are redacted; names, cities, emails and phones pass so tools keep working. **redact** stores the redacted text on the user message, and `with_redactions()` sends the model `[CREDITCARDNUMBER]`-style placeholders while the checkpoint keeps what the user typed. A redacted first message is also titled from its redacted text.
+- **Known limits.** The injection guard runs on the raw text and blocks most messages that *disclose* a secret ("My card is 4111...", "My password is ...", both about 1.0); "Charge 4111... for the order" scores 0.05 and is redacted instead. Masking first doesn't help ("My password is ****" also scores 1.0), and skipping the injection guard when PII is present would let an attacker bypass it with a card number. Phoenix's top-level `chat` span still records the raw message; the LLM spans show the redacted text.
 - **block** refuses the turn (below). **warn** lets the model answer, emits a `guard` event with `blocked: false`, and stores the findings on the user message so a reloaded thread still shows the amber flag.
 - **Playground:** `POST /guardrails/check` runs policy guards and any other Hugging Face classifier ids on a text, so models can be compared side by side in Swagger (`/docs`). The first call to a model downloads it; gated repos like Llama Prompt Guard 2 need the license accepted and `hf auth login`.
 - Only the user message is checked. Tool and RAG output are not (that is a future `guard_output` node).
@@ -531,7 +534,7 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 | `GET` | `/jobs/{id}` | | The job, and whether its events can still be followed |
 | `GET` | `/jobs/{id}/events` | `?after=` | SSE: every event so far, then live ones until the job ends; `404` once it is gone (10 minutes after finishing) |
 | `GET` | `/guardrails` | | The guards from `guardrails/policy.py` and the `input` order |
-| `POST` | `/guardrails/check` | `{text, guards?, models?}` | `{findings, models}`: each policy guard's finding with every label's score (all guards when `guards` is left out), and raw `{model, scores, ms}` for each extra model id; `400` for an unknown guard or a model that can't load |
+| `POST` | `/guardrails/check` | `{text, guards?, models?}` | `{findings, models, redacted}`: each policy guard's finding with every label's score (span guards return `spans` instead) (all guards when `guards` is left out), raw `{model, scores, ms}` for each extra model id, and the text with the redact guards' spans replaced; `400` for an unknown guard or a model that can't load |
 | `GET` | `/resume` | | `{tex, updated_at, has_pdf}`; the first call starts from the template |
 | `PUT` | `/resume` | `{tex}` | `{ok, log, tex, updated_at, has_pdf}`; saved only if it compiles, `log` holds the LaTeX error |
 | `GET` | `/resume/pdf` | | the compiled PDF, or `404` |
@@ -600,7 +603,7 @@ backend/
   main.py             FastAPI app, lifespan, CORS; lists each area's store and router
   mcp_servers.json    MCP servers loaded at startup
   core/               shared plumbing: config, db (connect, init_db), events, tracing
-  guardrails/         input guards: policy (models and thresholds), classify, check, /guardrails playground
+  guardrails/         input guards: policy (models and thresholds), classify, pii, check, /guardrails playground
   jobs/               background jobs: runner, jobs table, /jobs
   integrations/       Google auth, Gmail, Calendar clients
   agent/              LangGraph graph, Ollama model capabilities, /models and /tools

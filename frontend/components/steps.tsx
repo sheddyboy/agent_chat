@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, Brain, Check, ChevronRight, Clock, FileSearch, Hand, Loader2, ShieldAlert, ShieldX, TriangleAlert } from "lucide-react";
+import { Ban, Brain, Check, ChevronRight, Clock, EyeOff, FileSearch, Hand, Loader2, ShieldAlert, ShieldX, TriangleAlert } from "lucide-react";
 import type { ChatEvent } from "@/lib/sse";
 
 type Step = { icon: React.ReactNode; label: React.ReactNode; detail?: string; done: boolean };
@@ -47,7 +47,9 @@ function toSteps(events: ChatEvent[], live: boolean): Step[] {
       steps.push(
         e.blocked
           ? { icon: <ShieldX className="size-3.5 text-destructive" />, label: `Input blocked by ${guard} guard${label}`, done: true }
-          : { icon: <ShieldAlert className="size-3.5 text-amber-500" />, label: `Flagged by ${guard} guard${label}`, done: true },
+          : e.action === "redact"
+            ? { icon: <EyeOff className="size-3.5 text-sky-500" />, label: `Redacted by ${guard} guard${label}`, done: true }
+            : { icon: <ShieldAlert className="size-3.5 text-amber-500" />, label: `Flagged by ${guard} guard${label}`, done: true },
       );
     } else if (e.type === "interrupt") {
       steps.push({ icon: <Hand className="size-3.5 text-amber-500" />, label: "Waiting for approval", done: true });

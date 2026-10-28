@@ -21,11 +21,18 @@ def to_ui_messages(messages: list, interrupts, thread_id: str) -> list[dict]:
                     "images": kwargs.get("images", []),
                 }
             )
-            # Warn guards let the turn through; their flag rides on the user message
+            # Warn and redact guards let the turn through; their flag rides on the user message
             flag = kwargs.get("guard", {})
             warned = [] if flag.get("blocked") else [f for f in flag.get("findings", []) if f["flagged"]]
             events = [
-                {"type": "guard", "blocked": False, "guard": f["guard"], "label": f["label"], "score": round(f["score"], 3)}
+                {
+                    "type": "guard",
+                    "blocked": False,
+                    "guard": f["guard"],
+                    "action": f["action"],
+                    "label": f["label"],
+                    "score": round(f["score"], 3),
+                }
                 for f in warned
             ]
             ui.append({"role": "assistant", "content": "", "events": events})

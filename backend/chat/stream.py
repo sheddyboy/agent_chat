@@ -20,6 +20,7 @@ async def stream_graph(graph, input, thread_id: str, span, first_message: str | 
     stream_start = time.monotonic()
     answer = ""
     blocked = False
+    redacted = False
     try:
         # Root span is already open, so this tags the LLM and tool spans under it
         with using_session(thread_id):
@@ -35,6 +36,7 @@ async def stream_graph(graph, input, thread_id: str, span, first_message: str | 
                 elif mode == "custom":
                     # Tools emit fully formed events via get_stream_writer()
                     blocked = blocked or (chunk.get("type") == "guard" and chunk.get("blocked"))
+                    redacted = redacted or (chunk.get("type") == "guard" and chunk.get("action") == "redact")
                     yield event(**chunk)
                 elif mode == "messages":
                     msg, _meta = chunk
@@ -79,6 +81,10 @@ async def stream_graph(graph, input, thread_id: str, span, first_message: str | 
         yield event("error", message=str(e))
     span.set_output(answer)
     # Before done, which the frontend expects to be last (an interrupt sits right before it)
+    if first_message and redacted:
+        # The title model reads what the agent read, not the raw numbers
+        state = await graph.aget_state({"configurable": {"thread_id": thread_id}})
+        first_message = state.values["messages"][0].additional_kwargs["guard"]["redacted"]
     if first_message and blocked:
         # The title model must not read it, and the placeholder title would echo it
         set_title(thread_id, "Blocked message")
