@@ -1,5 +1,6 @@
-from core.config import settings
 from phoenix.otel import register
+
+from core.config import settings
 
 tracer_provider = register(
     project_name=settings.phoenix_project,

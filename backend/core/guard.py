@@ -1,16 +1,19 @@
 from functools import lru_cache
 
 import numpy as np
-from core.config import settings
 from huggingface_hub import hf_hub_download
 from onnxruntime import InferenceSession
 from tokenizers import Tokenizer
+
+from core.config import settings
 
 
 @lru_cache
 def classifier() -> tuple[InferenceSession, Tokenizer]:
     session = InferenceSession(hf_hub_download(settings.guard_model, "onnx/model.onnx"))
-    tokenizer = Tokenizer.from_file(hf_hub_download(settings.guard_model, "onnx/tokenizer.json"))
+    tokenizer = Tokenizer.from_file(
+        hf_hub_download(settings.guard_model, "onnx/tokenizer.json")
+    )
     tokenizer.enable_truncation(512)
     return session, tokenizer
 
