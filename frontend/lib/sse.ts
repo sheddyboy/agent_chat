@@ -1,6 +1,7 @@
 export type ChatEvent = { type: string; [key: string]: unknown };
 
-// POST and read the SSE stream with fetch, since EventSource only does GET
+// POST and read the SSE stream with fetch, since EventSource only does GET.
+// A null body makes it a GET, for following a running job.
 export async function streamEvents(
   url: string,
   body: unknown,
@@ -8,11 +9,16 @@ export async function streamEvents(
 ) {
   // FormData sets its own multipart header, so only JSON bodies get one
   const isForm = body instanceof FormData;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: isForm ? undefined : { "Content-Type": "application/json" },
-    body: isForm ? body : JSON.stringify(body),
-  });
+  const res = await fetch(
+    url,
+    body === null
+      ? undefined
+      : {
+          method: "POST",
+          headers: isForm ? undefined : { "Content-Type": "application/json" },
+          body: isForm ? body : JSON.stringify(body),
+        },
+  );
   if (!res.ok || !res.body) throw new Error(`${res.status} ${res.statusText}`);
 
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -30,4 +36,18 @@ export async function streamEvents(
       }
     }
   }
+}
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+// Follow a background job from its first event; it keeps running if this page goes away
+export function followJob(jobId: string, onEvent: (ev: ChatEvent) => void) {
+  return streamEvents(`${API}/jobs/${jobId}/events`, null, onEvent);
+}
+
+// The running job of this kind for a thread, document or day, if there is one
+export async function runningJob(kind: string, ref: string): Promise<string | null> {
+  const r = await fetch(`${API}/jobs?kind=${kind}&ref=${encodeURIComponent(ref)}&status=running`);
+  const jobs: { id: string }[] = r.ok ? await r.json() : [];
+  return jobs[0]?.id ?? null;
 }

@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     weather_lon: float | None = None
     # Name for that location; it becomes the Home place on first start
     weather_place: str = "Home"
+    # The morning briefing is written at this local time (HH:MM) if none exists yet; "" turns it off
+    briefing_at: str = "07:00"
 
     # resume.tex, its compiled PDF and earlier versions; personal, so git ignores it
     resume_dir: str = "resume"
