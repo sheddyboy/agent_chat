@@ -1,8 +1,9 @@
 """The guards as plain data: swap a model or threshold here, nowhere else.
 
-Each guard is a Hugging Face text classifier. `flag` lists the labels that count as a hit
+Most guards are Hugging Face text classifiers. `flag` lists the labels that count as a hit
 (names come from the model's id2label), and the guard fires when the top of those scores
-reaches `threshold`. `action` is "block" (refuse the turn) or "warn" (answer, but record it).
+reaches `threshold`. `action` is "block" (refuse the turn), "warn" (answer, but record it)
+or "redact" (for "spans" guards: the model sees [LABEL] in place of each span).
 """
 
 GUARDS = {
@@ -34,7 +35,16 @@ GUARDS = {
         "threshold": 0.7,
         "action": "warn",
     },
+    "pii": {
+        # A span guard: a token classifier marks words, plus regex for card numbers and IBANs.
+        # Only what the assistant never needs; names, cities, emails and phones stay so tools work
+        "task": "spans",
+        "model": "iiiorg/piiranha-v1-detect-personal-information",
+        "redact": ["CREDITCARDNUMBER", "ACCOUNTNUM", "SOCIALNUM", "TAXNUM", "IDCARDNUM", "DRIVERLICENSENUM", "PASSWORD"],
+        "threshold": 0.8,
+        "action": "redact",
+    },
 }
 
 # Guards run on each user message, in order
-INPUT = ["injection", "hate", "threat", "toxicity"]
+INPUT = ["injection", "hate", "threat", "toxicity", "pii"]

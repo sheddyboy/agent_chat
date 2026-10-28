@@ -85,11 +85,25 @@ def without_blocked(messages: list) -> list:
     ]
 
 
+def with_redactions(messages: list) -> list:
+    """Swap user messages for their redacted text, so the model sees [CREDITCARDNUMBER], not the number.
+
+    Only the copies sent to the model change; the checkpoint keeps what the user typed.
+    """
+    return [
+        msg.model_copy(update={"content": redacted})
+        if isinstance(msg, HumanMessage) and (redacted := msg.additional_kwargs.get("guard", {}).get("redacted"))
+        else msg
+        for msg in messages
+    ]
+
+
 def guard_event(finding: dict, blocked: bool) -> dict:
     return {
         "type": "guard",
         "blocked": blocked,
         "guard": finding["guard"],
+        "action": finding["action"],
         "label": finding["label"],
         "score": round(finding["score"], 3),
     }
@@ -103,9 +117,11 @@ def guard_input(state: ChatState) -> Command:
         return Command(goto="agent")
     # Stored on the message; a copy with the same id replaces it via add_messages
     flag = {"blocked": result["blocked"], "findings": result["findings"]}
+    if result["text"] != last.text:
+        flag["redacted"] = result["text"]
     writer = get_stream_writer()
     if not result["blocked"]:
-        # Warn guards only: the model still answers, the UI and history show the flag
+        # Warn and redact guards only: the model still answers, the UI and history show the flag
         for hit in hits:
             logger.info("flagged by %s guard (%s %.3f)", hit["guard"], hit["label"], hit["score"])
             writer(guard_event(hit, blocked=False))
@@ -142,7 +158,7 @@ def agent(state: ChatState) -> dict:
     tools = (
         ALL_TOOLS if enabled is None else [t for t in ALL_TOOLS if t.name in enabled]
     )
-    messages = with_images(without_blocked(state.get("messages", [])), "vision" in capabilities(model))
+    messages = with_images(with_redactions(without_blocked(state.get("messages", []))), "vision" in capabilities(model))
     attachments = state.get("attachments", [])
     if attachments:
         messages = [attachment_note(attachments), *messages]
