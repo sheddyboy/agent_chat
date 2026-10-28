@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from routes import briefing, catalog, chat, documents, images, overview, resume, threads, voice, weather
+from routes import briefing, catalog, chat, documents, images, jobs, overview, resume, threads, voice, weather
 from tools import ALL_TOOLS
 from tools.mcp_loader import load_mcp_tools
 
@@ -33,5 +33,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (chat, threads, documents, images, catalog, voice, briefing, overview, resume, weather):
+for module in (chat, threads, documents, images, catalog, voice, briefing, overview, resume, weather, jobs):
     app.include_router(module.router)
