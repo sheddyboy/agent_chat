@@ -2,7 +2,7 @@ import logging
 from typing import Annotated, TypedDict
 
 from core.config import settings
-from core.guard import injection_score
+from guardrails.check import check_input
 from images.store import image_block, image_path
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
@@ -87,19 +87,27 @@ def without_blocked(messages: list) -> list:
 
 def guard_input(state: ChatState) -> Command:
     last = state.get("messages", [])[-1]
-    score = injection_score(last.text)
-    if score < settings.guard_threshold:
+    result = check_input(last.text)
+    if not result["blocked"]:
         return Command(goto="agent")
-    logger.warning("blocked prompt injection (score %.3f): %r", score, last.text[:200])
-    get_stream_writer()({"type": "guard", "blocked": True, "score": round(score, 3)})
+    hit = next(f for f in result["findings"] if f["flagged"] and f["action"] == "block")
+    score = round(hit["score"], 3)
+    logger.warning("blocked by %s guard (score %.3f): %r", hit["guard"], score, last.text[:200])
+    get_stream_writer()({"type": "guard", "blocked": True, "guard": hit["guard"], "score": score})
     # Same id, so add_messages replaces the message with this flagged copy
     flagged = last.model_copy(
-        update={"additional_kwargs": {**last.additional_kwargs, "guard": {"blocked": True, "score": round(score, 3)}}}
+        update={
+            "additional_kwargs": {
+                **last.additional_kwargs,
+                "guard": {"blocked": True, "score": score, "findings": result["findings"]},
+            }
+        }
     )
-    # The refusal keeps thread history coherent: every user turn gets a reply
+    # The refusal keeps thread history coherent: every user turn gets a reply.
+    # guard_score is what history and without_blocked look for
     refusal = AIMessage(
-        "Blocked: this message looks like a prompt-injection attempt.",
-        response_metadata={"guard_score": round(score, 3)},
+        f"Blocked: this message was flagged by the {hit['guard']} guard ({hit['label']}).",
+        response_metadata={"guard_score": score, "guard": hit["guard"]},
     )
     return Command(goto=END, update={"messages": [flagged, refusal]})
 

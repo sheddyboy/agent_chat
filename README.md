@@ -206,7 +206,7 @@ stateDiagram-v2
 
 | Node | What it does |
 |---|---|
-| `guard_input` | Scores the latest user message with the injection classifier. At or above `guard_threshold` it emits a `guard` event and ends the turn with a refusal `AIMessage`, so thread history stays coherent. |
+| `guard_input` | Runs the input guards from `guardrails/policy.py` on the latest user message. If a blocking guard fires it emits a `guard` event and ends the turn with a refusal `AIMessage`, so thread history stays coherent. |
 | `agent` | Builds `ChatOllama` for the thread's model, binds only the enabled tools, calls `llm.invoke()`. With `think` on, reasoning is moved into `reasoning_content` and streamed separately. With files attached it adds a note naming them; with none attached (and `search_scope` at `attachments`) it leaves out `search_documents`. |
 | `approval` | If any tool call is in `SENSITIVE_TOOLS`, calls `interrupt()` and waits. Reject answers every call in the message with a ToolMessage so the agent can adapt. |
 | `tools` | Prebuilt `ToolNode` holding all local and MCP tools. |
@@ -392,11 +392,14 @@ sequenceDiagram
 
 ## Input guard
 
-[backend/core/guard.py](backend/core/guard.py) runs `protectai/deberta-v3-base-prompt-injection-v2` with onnxruntime and tokenizers, no torch. The model is downloaded from Hugging Face on first use and cached.
+[backend/guardrails/](backend/guardrails/) runs input guards as Hugging Face text classifiers through `transformers.pipeline`. Models download on first use and are cached.
 
+- [policy.py](backend/guardrails/policy.py) holds the guards as plain data: model, the labels that count as a hit, threshold and action. `INPUT` lists the guards each user message goes through. Swapping a model is a one line change there; labels come from the model's own `id2label`.
+- [check.py](backend/guardrails/check.py): `run(name, text)` returns one finding (`guard`, `model`, `label`, `score`, `flagged`, `action`), and `check_input(text)` runs every input guard.
+- The only guard today is `injection` (`protectai/deberta-v3-base-prompt-injection-v2`). Gmail's `safe()` runs the same guard on email subjects and snippets.
 - Only the user message is checked. Tool and RAG output are not (that is a future `guard_output` node).
 - Messages scoring `>= 0.9` are blocked. Benign text containing words like "ignore" can score around 0.88, so the threshold stays high. The [guard eval](#evals) reports precision and recall at 0.5, 0.7 and 0.9.
-- A block emits a `guard` event, logs a warning, and ends the turn with a refusal whose score sits in `response_metadata`.
+- A block emits a `guard` event naming the guard, logs a warning, flags the user message (`additional_kwargs["guard"]`, with every finding) and ends the turn with a refusal whose score sits in `response_metadata`. `without_blocked()` drops both from what the model sees on later turns; the checkpoint keeps them for history.
 
 ## Frontend
 
@@ -553,7 +556,6 @@ Backend settings are in [backend/core/config.py](backend/core/config.py) (pydant
 | `chunk_size` / `chunk_overlap` | `1000` / `150` | |
 | `retrieval_k` / `rerank_top_n` | `20` / `5` | |
 | `rerank_model` | `Xenova/ms-marco-MiniLM-L-6-v2` | |
-| `guard_model` / `guard_threshold` | `protectai/deberta-v3-base-prompt-injection-v2` / `0.9` | |
 | `upload_dir`, `notes_dir`, `db_path` | `data/uploads`, `data/notes`, `data/app.db` | |
 | `image_dir` / `image_max_mb` | `data/uploads/images` / `10` | Chat images, stored under a content hash, never ingested |
 | `mcp_config` / `mcp_workspace` | `mcp_servers.json` / `data/workspace` | The workspace must match the filesystem root in the JSON |
@@ -584,7 +586,8 @@ Everything the backend writes (SQLite, Qdrant, uploads, notes, the MCP workspace
 backend/
   main.py             FastAPI app, lifespan, CORS; lists each area's store and router
   mcp_servers.json    MCP servers loaded at startup
-  core/               shared plumbing: config, db (connect, init_db), events, tracing, guard
+  core/               shared plumbing: config, db (connect, init_db), events, tracing
+  guardrails/         input guards: policy (models and thresholds), classify, check
   jobs/               background jobs: runner, jobs table, /jobs
   integrations/       Google auth, Gmail, Calendar clients
   agent/              LangGraph graph, Ollama model capabilities, /models and /tools
@@ -619,7 +622,7 @@ docs/
 
 The rule is extend by adding, not rewiring.
 
-- **A feature:** add a folder with `router.py` (thin, its own prefix and tags), plus `store.py` (its table and an `init(conn)`), `tool.py` and logic files as needed. Then add one line each to `ROUTERS` and `STORES` in `main.py`, and its tool to `tools/__init__.py`. Features import from `core/`, `jobs/` and `integrations/`; imports between features must not form a cycle.
+- **A feature:** add a folder with `router.py` (thin, its own prefix and tags), plus `store.py` (its table and an `init(conn)`), `tool.py` and logic files as needed. Then add one line each to `ROUTERS` and `STORES` in `main.py`, and its tool to `tools/__init__.py`. Features import from `core/`, `jobs/`, `integrations/` and `guardrails/`; imports between features must not form a cycle.
 - **A tool:** put an `@tool` function in its feature's `tool.py` (or in `backend/tools/` if it belongs to no feature) and add one line to `ALL_TOOLS`. If it has side effects, add its name to `SENSITIVE_TOOLS` and it gets an approval card for free. If it needs a key, token or binary, register it only when that exists, like `web_search`, so the agent never sees a tool that can't run.
 - **An MCP server:** add an entry to `mcp_servers.json`. Its tools appear in `/tools` grouped under the server name. Add any write tools to `SENSITIVE_TOOLS`.
 - **A model:** `ollama pull` it and add it to `chat_models`. Thinking support is detected from Ollama.

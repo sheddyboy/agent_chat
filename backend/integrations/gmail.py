@@ -4,9 +4,8 @@ import re
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
-from core.config import settings
 from googleapiclient.discovery import build
-from core.guard import injection_score
+from guardrails.check import run
 
 from integrations.google_auth import get_credentials
 
@@ -59,7 +58,7 @@ def build_query(since: str, query: str, unread_only: bool) -> str:
 def safe(text: str) -> str:
     """Hide text the guard flags. It reads 512 tokens, so long text is checked in pieces."""
     pieces = [text[i : i + 2000] for i in range(0, len(text), 2000)]
-    if any(injection_score(p) >= settings.guard_threshold for p in pieces):
+    if any(run("injection", p)["flagged"] for p in pieces):
         return HIDDEN
     return text
 
