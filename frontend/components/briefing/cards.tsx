@@ -94,7 +94,7 @@ export function MailPicks({ briefing, onAsk, index }: { briefing: Briefing; onAs
                     <span className="truncate text-sm font-medium">{m.from}</span>
                     <span className="hidden truncate text-xs text-muted-foreground sm:inline">{m.subject}</span>
                   </span>
-                  <span className="block truncate text-xs text-muted-foreground">{m.why}</span>
+                  {m.why && <span className="block truncate text-xs text-muted-foreground">{m.why}</span>}
                 </span>
               </a>
               <button
