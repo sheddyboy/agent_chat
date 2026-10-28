@@ -16,5 +16,5 @@ export type Briefing = {
   mail_note: string | null;
   today: Part<{ events: CalendarEvent[]; free: Slot[] }> | null;
   tomorrow: Part<{ events: CalendarEvent[] }> | null;
-  weather: Part<{ temp: number; code: number; sky: string; min: number; max: number; rain: number }> | null;
+  weather: Part<{ temp: number; code: number; sky: string; min: number; max: number; rain: number; summary?: string }> | null;
 };

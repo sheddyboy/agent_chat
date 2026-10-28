@@ -11,6 +11,7 @@ import { ResumeWidget } from "@/components/overview/resume";
 import { ScheduleWidget } from "@/components/overview/schedule";
 import { StatusWidget } from "@/components/overview/status";
 import { WeatherWidget } from "@/components/overview/weather";
+import { RainAlert } from "@/components/weather/rain-banner";
 
 function greeting(hour: number) {
   return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -49,6 +50,8 @@ export default function Overview() {
                 </>
               )}
             </div>
+
+            <RainAlert />
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               <BriefingWidget index={0} className="md:col-span-2 xl:col-span-3" />

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Day, HeadsUp, MailPicks, Weather } from "@/components/briefing/cards";
 import { FollowUp } from "@/components/briefing/follow-up";
 import { useNow } from "@/components/overview/timeline";
+import { WeatherWidget } from "@/components/overview/weather";
 import type { Briefing } from "@/components/briefing/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -92,6 +93,19 @@ export default function BriefingPage() {
   }
 
   const isToday = briefing && now ? briefing.day === localDay(now) : false;
+  // Today's briefing shows the live forecast; a past day keeps the weather it was written with
+  const weatherCard = (index: number) =>
+    isToday ? (
+      <WeatherWidget index={index} />
+    ) : (
+      briefing?.weather && (
+        <Weather
+          part={briefing.weather}
+          asOf={new Date(`${briefing.created_at}Z`).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
+          index={index}
+        />
+      )
+    );
 
   return (
     <div className="flex h-dvh w-full overflow-hidden">
@@ -181,16 +195,8 @@ export default function BriefingPage() {
                 <div key={`${briefing.day}-${briefing.created_at}`} className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <HeadsUp text={briefing.heads_up} index={0} />
                   {briefing.today && <Day title="Today" part={briefing.today} now={isToday ? now : null} index={1} />}
-                  {briefing.tomorrow ? (
-                    <Day title="Tomorrow" part={briefing.tomorrow} index={2} />
-                  ) : (
-                    briefing.weather && <Weather part={briefing.weather} index={2} />
-                  )}
-                  {briefing.tomorrow && briefing.weather && (
-                    <div className="md:col-span-2">
-                      <Weather part={briefing.weather} index={3} />
-                    </div>
-                  )}
+                  {briefing.tomorrow ? <Day title="Tomorrow" part={briefing.tomorrow} index={2} /> : weatherCard(2)}
+                  {briefing.tomorrow && <div className="md:col-span-2">{weatherCard(3)}</div>}
                   <MailPicks briefing={briefing} onAsk={ask} index={4} />
                   <div ref={followUp} className="md:col-span-2">
                     <FollowUp key={briefing.thread_id} threadId={briefing.thread_id} question={question} setQuestion={setQuestion} />

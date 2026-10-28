@@ -74,7 +74,11 @@ def weather() -> dict:
         "rain": today["rain"],
         "summary": f["summary"],
         "alert": f["alert"],
-        "hourly": [{"time": h["time"][11:16], "temp": h["temp"], "code": h["code"], "rain": h["rain"]} for h in f["hourly"][:HOURS]],
+        "is_day": f["current"]["is_day"],
+        "hourly": [
+            {"time": h["time"][11:16], "temp": h["temp"], "code": h["code"], "rain": h["rain"], "is_day": h["is_day"]}
+            for h in f["hourly"][:HOURS]
+        ],
     }
 
 
