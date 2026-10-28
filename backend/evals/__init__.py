@@ -1,4 +1,4 @@
-from config import settings
+from core.config import settings
 
 # Every suite runs against its own Qdrant folder, so real uploads stay untouched
 # and the local-mode lock never clashes with a running uvicorn

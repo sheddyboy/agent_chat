@@ -1,4 +1,4 @@
-from config import settings
+from core.config import settings
 from fastapi import APIRouter
 from models import capabilities
 from tools import ALL_TOOLS, SENSITIVE_TOOLS

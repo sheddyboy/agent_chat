@@ -2,7 +2,7 @@ import io
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from config import settings
+from core.config import settings
 
 # torch and diffusers are imported inside the functions: together they add about
 # 10 s to backend startup, which only the first drawing should pay

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from config import settings
+from core.config import settings
 from fastembed.rerank.cross_encoder import TextCrossEncoder
 from langchain_core.documents import Document
 

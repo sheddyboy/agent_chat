@@ -2,7 +2,7 @@ import re
 
 import jobs
 from briefing import run, shown, today_key
-from db import get_briefing, list_briefings
+from core.db import get_briefing, list_briefings
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse

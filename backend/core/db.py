@@ -3,7 +3,7 @@ import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime
 
-from config import settings
+from core.config import settings
 
 # LangGraph's checkpoint tables live in the same file; these are only ours.
 SCHEMA = """

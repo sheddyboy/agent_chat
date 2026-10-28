@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from config import settings
+from core.config import settings
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from images import IMAGE_TYPES, image_path, save_image

@@ -3,7 +3,7 @@ import hashlib
 import re
 from pathlib import Path
 
-from config import settings
+from core.config import settings
 
 IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 MIME_TYPES = {ext: mime for mime, ext in IMAGE_TYPES.items()}

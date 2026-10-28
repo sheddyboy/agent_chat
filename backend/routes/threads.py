@@ -1,4 +1,4 @@
-from db import delete_thread, get_thread, list_threads
+from core.db import delete_thread, get_thread, list_threads
 from fastapi import APIRouter, HTTPException, Request
 from history import to_ui_messages
 

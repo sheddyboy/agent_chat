@@ -13,8 +13,8 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 
-from db import create_job, finish_job
-from events import event
+from core.db import create_job, finish_job
+from core.events import event
 
 logger = logging.getLogger(__name__)
 

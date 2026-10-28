@@ -1,4 +1,4 @@
-from config import settings
+from core.config import settings
 from langchain_ollama import ChatOllama
 
 PROMPT = """Write a short title (3 to 6 words) for a chat that starts with the message below.

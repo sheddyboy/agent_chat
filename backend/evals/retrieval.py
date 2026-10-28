@@ -1,6 +1,6 @@
 """Retrieval suite: does hybrid search (with and without rerank) find the gold paragraphs?"""
 
-from config import settings
+from core.config import settings
 from phoenix.client import Client
 from phoenix.client.experiments import run_experiment
 from retrieval.hybrid import hybrid_search

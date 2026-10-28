@@ -7,8 +7,8 @@ from urllib.parse import urlparse
 
 import httpx
 from briefing import MAIL_QUERY
-from config import settings
-from db import home_place, list_documents
+from core.config import settings
+from core.db import home_place, list_documents
 from integrations.google_auth import has_scope
 
 INBOX_ROWS = 5

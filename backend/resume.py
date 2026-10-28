@@ -7,7 +7,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from config import settings
+from core.config import settings
 
 TEMPLATE = Path(__file__).parent / "resume_template.tex"
 COMPILE_TIMEOUT = 60

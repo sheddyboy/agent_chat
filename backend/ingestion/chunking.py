@@ -1,4 +1,4 @@
-from config import settings
+from core.config import settings
 from langchain_core.documents import Document
 from langchain_text_splitters import MarkdownTextSplitter
 

@@ -1,7 +1,7 @@
 from functools import lru_cache
 
 import numpy as np
-from config import settings
+from core.config import settings
 from huggingface_hub import hf_hub_download
 from onnxruntime import InferenceSession
 from tokenizers import Tokenizer

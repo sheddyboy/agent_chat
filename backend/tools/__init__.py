@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 
-from config import settings
+from core.config import settings
 from integrations.google_auth import has_scope
 
 from tools.calculator import calculator

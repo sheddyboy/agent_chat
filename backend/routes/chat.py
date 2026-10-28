@@ -2,8 +2,8 @@ import uuid
 from typing import Literal
 
 import jobs
-from config import settings
-from db import get_document, get_thread, touch_thread
+from core.config import settings
+from core.db import get_document, get_thread, touch_thread
 from fastapi import APIRouter, HTTPException, Request
 from images import image_path
 from langchain_core.messages import HumanMessage
@@ -11,7 +11,7 @@ from langgraph.types import Command
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 from stream import stream_graph
-from tracing import tracer
+from core.tracing import tracer
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 

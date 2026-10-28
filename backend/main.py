@@ -1,9 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-import tracing  # noqa: F401  registers Phoenix before any route runs
-from config import settings
-from db import init_db
+import core.tracing  # noqa: F401  registers Phoenix before any route runs
+from core.config import settings
+from core.db import init_db
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from graph import build_graph

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from config import settings
+from core.config import settings
 from langchain_ollama import OllamaEmbeddings
 from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
 from qdrant_client import QdrantClient, models

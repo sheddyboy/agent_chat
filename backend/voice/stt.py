@@ -4,7 +4,7 @@ from functools import lru_cache
 
 import numpy as np
 import onnx_asr
-from config import settings
+from core.config import settings
 
 
 @lru_cache

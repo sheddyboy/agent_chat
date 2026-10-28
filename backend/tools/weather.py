@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 import weather
-from db import home_place
+from core.db import home_place
 from langchain_core.tools import tool
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]

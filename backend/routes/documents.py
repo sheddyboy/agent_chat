@@ -1,13 +1,13 @@
 from pathlib import Path
 
 import jobs
-from config import settings
-from db import get_document, list_documents
-from events import event
+from core.config import settings
+from core.db import get_document, list_documents
+from core.events import event
 from fastapi import APIRouter, HTTPException, UploadFile
 from ingestion.pipeline import ingest, make_doc_id
 from sse_starlette.sse import EventSourceResponse
-from tracing import tracer
+from core.tracing import tracer
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 

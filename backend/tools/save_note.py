@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from config import settings
+from core.config import settings
 from langchain_core.tools import tool
 
 

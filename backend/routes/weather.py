@@ -1,5 +1,5 @@
 import weather
-from db import add_place, delete_place, get_place, home_place, list_places, set_home
+from core.db import add_place, delete_place, get_place, home_place, list_places, set_home
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field

@@ -4,7 +4,7 @@ import re
 import string
 from functools import partial
 
-from config import settings
+from core.config import settings
 from graph import build_graph
 from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_ollama import ChatOllama

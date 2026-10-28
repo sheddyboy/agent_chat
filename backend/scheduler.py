@@ -6,8 +6,8 @@ from datetime import datetime
 
 import jobs
 from briefing import run, today_key
-from config import settings
-from db import get_briefing
+from core.config import settings
+from core.db import get_briefing
 
 logger = logging.getLogger(__name__)
 

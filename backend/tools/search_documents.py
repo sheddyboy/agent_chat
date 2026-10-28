@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from config import settings
+from core.config import settings
 from langchain_core.tools import tool
 from langgraph.config import get_stream_writer
 from langgraph.prebuilt import InjectedState

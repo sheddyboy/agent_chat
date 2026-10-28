@@ -4,9 +4,9 @@ import re
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
-from config import settings
+from core.config import settings
 from googleapiclient.discovery import build
-from guard import injection_score
+from core.guard import injection_score
 
 from integrations.google_auth import get_credentials
 

@@ -6,11 +6,11 @@ from datetime import datetime
 from email.utils import parseaddr
 from pathlib import Path
 
-from config import settings
-from db import delete_thread, get_briefing, home_place, save_briefing, set_title, touch_thread
-from events import event
+from core.config import settings
+from core.db import delete_thread, get_briefing, home_place, save_briefing, set_title, touch_thread
+from core.events import event
 from starlette.concurrency import run_in_threadpool
-from tracing import tracer
+from core.tracing import tracer
 from integrations.google_auth import has_scope
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama

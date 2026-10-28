@@ -1,8 +1,8 @@
 """Guard suite: does the prompt-injection classifier block injections and let benign prompts through?"""
 
-from config import settings
+from core.config import settings
 from datasets import load_dataset
-from guard import injection_score
+from core.guard import injection_score
 from phoenix.client import Client
 from phoenix.client.experiments import run_experiment
 

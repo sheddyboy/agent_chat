@@ -3,8 +3,8 @@ import hashlib
 import uuid
 from pathlib import Path
 
-from db import set_document_status, upsert_document
-from events import event
+from core.db import set_document_status, upsert_document
+from core.events import event
 
 from ingestion.chunking import chunk_pages
 from ingestion.loader import load_pages
