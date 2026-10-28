@@ -1,15 +1,15 @@
 import shutil
 from pathlib import Path
 
-from config import settings
+from core.config import settings
 from integrations.google_auth import has_scope
 
 from tools.calculator import calculator
 from tools.datetime_tool import get_datetime
-from tools.generate_image import generate_image
+from images.tool import generate_image
 from tools.save_note import save_note
-from tools.search_documents import search_documents
-from tools.weather import get_weather
+from documents.tool import search_documents
+from weather.tool import get_weather
 
 ALL_TOOLS = [get_datetime, calculator, search_documents, save_note, generate_image, get_weather]
 
@@ -45,6 +45,6 @@ if has_scope("calendar.readonly"):
 
 # The resume compiles with Tectonic (brew install tectonic)
 if shutil.which("tectonic"):
-    from tools.resume import edit_resume, read_resume
+    from resume.tool import edit_resume, read_resume
 
     ALL_TOOLS += [read_resume, edit_resume]

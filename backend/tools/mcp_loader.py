@@ -2,7 +2,7 @@ import json
 import logging
 from pathlib import Path
 
-from config import settings
+from core.config import settings
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 log = logging.getLogger(__name__)

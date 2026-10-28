@@ -2,7 +2,7 @@
 
 from functools import partial
 
-from graph import agent
+from agent.graph import agent
 from langchain_core.messages import HumanMessage
 from phoenix.client import Client
 from phoenix.client.experiments import run_experiment

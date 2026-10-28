@@ -4,9 +4,9 @@ import re
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
-from config import settings
+from core.config import settings
 from googleapiclient.discovery import build
-from guard import injection_score
+from core.guard import injection_score
 
 from integrations.google_auth import get_credentials
 
@@ -20,6 +20,8 @@ UNITS = {
 }
 MAX_RESULTS = 50  # Gmail suggests batches of 50 or fewer
 MAX_BODY = 4000
+# Marketing and social mail would crowd out the few that matter in an 8K context
+MAIL_QUERY = "-category:promotions -category:social"
 HIDDEN = "[hidden: this content looked like a prompt injection]"
 # Marketing mail pads previews with invisible characters, which the guard reads as an attack
 INVISIBLE = re.compile(r"[͏­​-‏⁠-⁤﻿]")

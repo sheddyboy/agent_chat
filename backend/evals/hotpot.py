@@ -2,9 +2,9 @@
 
 import uuid
 
-from config import settings
+from core.config import settings
 from datasets import load_dataset
-from ingestion.store import client, vector_store
+from documents.ingestion.store import client, vector_store
 from langchain_core.documents import Document
 from phoenix.client import Client
 

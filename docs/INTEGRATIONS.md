@@ -4,7 +4,7 @@ Connections to my own accounts and data so the agent knows about my life, not ju
 
 Rules for every integration:
 - Read-only first. Anything that writes or sends goes in `SENSITIVE_TOOLS`.
-- Tokens and credentials live in `backend/secrets/`, gitignored.
+- Tokens and credentials live in `backend/data/secrets/`, gitignored.
 - Content from outside (emails, messages, pages) is untrusted: run it through `guard.py` before the model sees it.
 - Tools are registered only when their token exists, like `web_search` with the Tavily key.
 - Keep tool output compact. The chat model has an 8K context.
@@ -35,7 +35,7 @@ Rules for every integration:
     - Guard false positives: login-code emails get their snippet hidden. The input guard can also block my own message ("open my latest email ... and give me its Gmail link" scored 0.995); rewording works.
     - Time ranges use 30-day months and 365-day years, and Gmail filters by the second it received the mail.
     - Each turn takes the tool 0.3 to 2 s; the rest is the model.
-  - **Setup:** Google Cloud project, Gmail API on, OAuth client of type Desktop app, `credentials.json` into `backend/secrets/`, then `uv run python -m integrations.google_auth` from `backend/` once. Scope `gmail.readonly`. The tools only appear when `secrets/token.json` exists.
+  - **Setup:** Google Cloud project, Gmail API on, OAuth client of type Desktop app, `credentials.json` into `backend/data/secrets/`, then `uv run python -m integrations.google_auth` from `backend/` once. Scope `gmail.readonly`. The tools only appear when `data/secrets/token.json` exists.
   - **Gotcha:** an OAuth app in Testing mode expires refresh tokens after 7 days and the tools then ask me to log in again. Set the app to In production (unverified is fine for personal use).
   - Files: `integrations/google_auth.py`, `integrations/gmail.py`, `tools/gmail.py`.
   - **Skipped:** an `email_insights` tool (stats plus map-reduce summaries over long ranges) and a UI connect status with a local cache. Recent overviews already work through `search_emails`, and searches are fast without a cache. Revisit if month-long overviews turn out to matter.

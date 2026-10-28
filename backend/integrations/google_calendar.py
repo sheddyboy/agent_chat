@@ -1,7 +1,7 @@
 import re
 from datetime import date, datetime, time, timedelta
 
-from config import settings
+from core.config import settings
 from googleapiclient.discovery import build
 
 from integrations.gmail import INVISIBLE, safe

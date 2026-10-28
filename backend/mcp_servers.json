@@ -2,7 +2,7 @@
   "filesystem": {
     "transport": "stdio",
     "command": "npx",
-    "args": ["-y", "@modelcontextprotocol/server-filesystem", "workspace"]
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "data/workspace"]
   },
   "fetch": {
     "transport": "stdio",

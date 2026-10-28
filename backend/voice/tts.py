@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
-from config import settings
+from core.config import settings
 from kokoro_onnx import Kokoro
 
 RELEASE = (

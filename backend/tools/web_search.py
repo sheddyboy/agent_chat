@@ -1,4 +1,4 @@
-from config import settings
+from core.config import settings
 from langchain_core.tools import tool
 from tavily import TavilyClient
 

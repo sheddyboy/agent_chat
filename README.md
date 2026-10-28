@@ -50,8 +50,8 @@ flowchart LR
     end
 
     subgraph Backend["FastAPI backend"]
-        API["routes/<br/>stream.py to SSE"]
-        G["LangGraph<br/>graph.py"]
+        API["feature routers<br/>chat/stream.py to SSE"]
+        G["LangGraph<br/>agent/graph.py"]
         T["Local tools"]
         M["MCP tools"]
         GU["Guard<br/>ONNX classifier"]
@@ -173,7 +173,7 @@ curl -N -X POST localhost:8000/chat/<thread_id>/resume \
 
 ## The agent graph
 
-The graph lives in [backend/graph.py](backend/graph.py). Every node is a plain function.
+The graph lives in [backend/agent/graph.py](backend/agent/graph.py). Every node is a plain function.
 
 ```mermaid
 stateDiagram-v2
@@ -264,7 +264,7 @@ Local tools live in [backend/tools/](backend/tools/), one file each, registered 
 | `get_datetime` | Current local date, time and weekday | |
 | `calculator` | Safe arithmetic via an AST walker (`+ - * / // % **`) | |
 | `search_documents` | Hybrid search + rerank over uploaded documents | |
-| `save_note` | Writes a markdown note to `notes/` | yes |
+| `save_note` | Writes a markdown note to `data/notes/` | yes |
 | `generate_image` | Draws a 512x512 image with SDXL Turbo, stored like uploaded images | yes |
 | `web_search` | Tavily search, registered only when `TAVILY_API_KEY` is set | |
 
@@ -272,7 +272,7 @@ MCP servers are declared in [backend/mcp_servers.json](backend/mcp_servers.json)
 
 | Server | Launch | Notes |
 |---|---|---|
-| `filesystem` | `npx @modelcontextprotocol/server-filesystem workspace` | Rooted at `backend/workspace/`. `write_file`, `edit_file`, `move_file`, `create_directory` need approval. |
+| `filesystem` | `npx @modelcontextprotocol/server-filesystem data/workspace` | Rooted at `backend/data/workspace/`. `write_file`, `edit_file`, `move_file`, `create_directory` need approval. |
 | `fetch` | `uvx mcp-server-fetch` | Fetches a URL as markdown. |
 
 ```mermaid
@@ -294,7 +294,7 @@ MCP tools behave exactly like local ones: the agent binds them, `ToolNode` runs 
 
 ### Ingestion
 
-`POST /documents` saves the upload to `uploads/` and streams progress while [backend/ingestion/pipeline.py](backend/ingestion/pipeline.py) runs. Blocking work runs in a thread.
+`POST /documents` saves the upload to `data/uploads/` and streams progress while [backend/documents/ingestion/pipeline.py](backend/documents/ingestion/pipeline.py) runs. Blocking work runs in a thread.
 
 ```mermaid
 flowchart LR
@@ -364,7 +364,7 @@ sequenceDiagram
 
 ## Input guard
 
-[backend/guard.py](backend/guard.py) runs `protectai/deberta-v3-base-prompt-injection-v2` with onnxruntime and tokenizers, no torch. The model is downloaded from Hugging Face on first use and cached.
+[backend/core/guard.py](backend/core/guard.py) runs `protectai/deberta-v3-base-prompt-injection-v2` with onnxruntime and tokenizers, no torch. The model is downloaded from Hugging Face on first use and cached.
 
 - Only the user message is checked. Tool and RAG output are not (that is a future `guard_output` node).
 - Messages scoring `>= 0.9` are blocked. Benign text containing words like "ignore" can score around 0.88, so the threshold stays high. The [guard eval](#evals) reports precision and recall at 0.5, 0.7 and 0.9.
@@ -419,7 +419,7 @@ The `done` event carries the `trace_id`, and the UI links to Phoenix's `/redirec
 
 ## Evals
 
-One suite per component in [backend/evals/](backend/evals/), on public or written datasets, with our own evaluators, all run as Phoenix experiments. Importing `evals` points Qdrant at a separate `eval_qdrant_data/` folder, so real uploads stay untouched and there is no lock clash with a running backend.
+One suite per component in [backend/evals/](backend/evals/), on public or written datasets, with our own evaluators, all run as Phoenix experiments. Importing `evals` points Qdrant at a separate `data/eval_qdrant/` folder, so real uploads stay untouched and there is no lock clash with a running backend.
 
 ```mermaid
 flowchart LR
@@ -493,7 +493,7 @@ The first voice call downloads its model (about 650 MB for speech to text, 140 M
 
 ## Configuration
 
-Backend settings are in [backend/config.py](backend/config.py) (pydantic-settings). Any field can be overridden by an environment variable or `backend/.env`, for example `DEFAULT_MODEL=llama3.1:8b`.
+Backend settings are in [backend/core/config.py](backend/core/config.py) (pydantic-settings). Any field can be overridden by an environment variable or `backend/.env`, for example `DEFAULT_MODEL=llama3.1:8b`.
 
 | Setting | Default | Notes |
 |---|---|---|
@@ -505,18 +505,18 @@ Backend settings are in [backend/config.py](backend/config.py) (pydantic-setting
 | `phoenix_project` | `agent-chat` | |
 | `tavily_api_key` | empty | `web_search` is registered only when set |
 | `cors_origins` | `["http://localhost:3000"]` | |
-| `qdrant_path` / `qdrant_collection` | `qdrant_data` / `documents` | |
+| `qdrant_path` / `qdrant_collection` | `data/qdrant` / `documents` | |
 | `embedding_model` / `sparse_model` | `qwen3-embedding:0.6b` / `Qdrant/bm25` | |
 | `chunk_size` / `chunk_overlap` | `1000` / `150` | |
 | `retrieval_k` / `rerank_top_n` | `20` / `5` | |
 | `rerank_model` | `Xenova/ms-marco-MiniLM-L-6-v2` | |
 | `guard_model` / `guard_threshold` | `protectai/deberta-v3-base-prompt-injection-v2` / `0.9` | |
-| `upload_dir`, `notes_dir`, `db_path` | `uploads`, `notes`, `app.db` | |
-| `image_dir` / `image_max_mb` | `uploads/images` / `10` | Chat images, stored under a content hash, never ingested |
-| `mcp_config` / `mcp_workspace` | `mcp_servers.json` / `workspace` | The workspace must match the filesystem root in the JSON |
+| `upload_dir`, `notes_dir`, `db_path` | `data/uploads`, `data/notes`, `data/app.db` | |
+| `image_dir` / `image_max_mb` | `data/uploads/images` / `10` | Chat images, stored under a content hash, never ingested |
+| `mcp_config` / `mcp_workspace` | `mcp_servers.json` / `data/workspace` | The workspace must match the filesystem root in the JSON |
 | `stt_model` | `nemo-parakeet-tdt-0.6b-v2` | Any `onnx-asr` model name; English only by default |
 | `tts_voice` / `tts_speed` | `af_heart` / `1.0` | Kokoro voice names are listed in its VOICES.md |
-| `voice_dir` | `voice_models` | Kokoro files, downloaded on first use |
+| `voice_dir` | `data/voice_models` | Kokoro files, downloaded on first use |
 | `image_model` / `image_vae` | `stabilityai/sdxl-turbo` / `madebyollin/sdxl-vae-fp16-fix` | About 7 GB, downloaded to the Hugging Face cache on the first drawing |
 | `image_steps` | `2` | 1 to 4 for Turbo |
 | `image_unload_after_s` | `300` | Idle seconds before the image model is freed |
@@ -528,29 +528,30 @@ Frontend environment:
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` |
 | `NEXT_PUBLIC_PHOENIX_URL` | `http://localhost:6006` |
 
-Local data (`qdrant_data/`, `eval_qdrant_data/`, `uploads/`, `notes/`, `workspace/`, `voice_models/`, `*.db`, `.env`) is created inside `backend/` and gitignored.
+Everything the backend writes (SQLite, Qdrant, uploads, notes, the MCP workspace, voice models, the resume, Google secrets) lives in `backend/data/`, which is gitignored along with `.env`.
 
 ## Project layout
 
 ```
 backend/
-  main.py             FastAPI app, lifespan, CORS, include_router
-  routes/             one APIRouter per URL prefix: chat, threads, documents, images, catalog, voice
-  stream.py           graph stream to SSE events
-  tracing.py          Phoenix register() and shared tracer
-  graph.py            ChatState, nodes, build_graph()
-  guard.py            prompt-injection classifier (onnx)
-  images.py           store chat images, build image blocks for vision models
-  imagegen.py         SDXL Turbo pipeline on one worker thread, unloaded when idle
-  models.py           cached Ollama capabilities (thinking, vision)
-  events.py           event(type, **data) helper
-  config.py           settings
+  main.py             FastAPI app, lifespan, CORS; lists each area's store and router
   mcp_servers.json    MCP servers loaded at startup
-  tools/              one file per tool, ALL_TOOLS and SENSITIVE_TOOLS in __init__.py
-  ingestion/          loader, chunking, store, pipeline
-  retrieval/          hybrid search, rerank
-  voice/              speech to text (stt.py), text to speech (tts.py)
+  core/               shared plumbing: config, db (connect, init_db), events, tracing, guard
+  jobs/               background jobs: runner, jobs table, /jobs
+  integrations/       Google auth, Gmail, Calendar clients
+  agent/              LangGraph graph, Ollama model capabilities, /models and /tools
+  chat/               /chat: the turn, graph stream to SSE events, titles
+  threads/            /threads: threads table, history for the UI
+  documents/          /documents: table, search tool, ingestion/ and retrieval/
+  images/             /images: image store, SDXL Turbo generation, generate_image tool
+  weather/            /weather: Open-Meteo client, places table, get_weather tool
+  resume/             /resume: LaTeX resume, template, read and edit tools
+  voice/              /voice: speech to text, text to speech
+  overview/           /overview: dashboard widgets
+  briefing/           /briefing: compose, briefings table, morning scheduler
+  tools/              ALL_TOOLS and SENSITIVE_TOOLS registry, plus tools with no feature of their own
   evals/              hotpot setup, retrieval, answers, guard, tools suites
+  data/               everything the app writes (gitignored)
 frontend/
   app/                chat page, documents page
   components/         sidebar, steps, activity, sources, approval card, tool picker
@@ -563,7 +564,8 @@ docs/
 
 The rule is extend by adding, not rewiring.
 
-- **A tool:** add a file in `backend/tools/` with an `@tool` function and one line in `ALL_TOOLS`. If it has side effects, add its name to `SENSITIVE_TOOLS` and it gets an approval card for free.
+- **A feature:** add a folder with `router.py` (thin, its own prefix and tags), plus `store.py` (its table and an `init(conn)`), `tool.py` and logic files as needed. Then add one line each to `ROUTERS` and `STORES` in `main.py`, and its tool to `tools/__init__.py`. Features import from `core/`, `jobs/` and `integrations/`; imports between features must not form a cycle.
+- **A tool:** put an `@tool` function in its feature's `tool.py` (or in `backend/tools/` if it belongs to no feature) and add one line to `ALL_TOOLS`. If it has side effects, add its name to `SENSITIVE_TOOLS` and it gets an approval card for free.
 - **An MCP server:** add an entry to `mcp_servers.json`. Its tools appear in `/tools` grouped under the server name. Add any write tools to `SENSITIVE_TOOLS`.
 - **A model:** `ollama pull` it and add it to `chat_models`. Thinking support is detected from Ollama.
 - **An event:** call `get_stream_writer()({"type": "...", ...})` from a node or tool, then add one `case` in the frontend.
