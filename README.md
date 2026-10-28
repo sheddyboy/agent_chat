@@ -395,8 +395,9 @@ sequenceDiagram
 [backend/guardrails/](backend/guardrails/) runs input guards as Hugging Face text classifiers through `transformers.pipeline`. Models download on first use and are cached.
 
 - [policy.py](backend/guardrails/policy.py) holds the guards as plain data: model, the labels that count as a hit, threshold and action. `INPUT` lists the guards each user message goes through. Swapping a model is a one line change there; labels come from the model's own `id2label`.
-- [check.py](backend/guardrails/check.py): `run(name, text)` returns one finding (`guard`, `model`, `label`, `score`, `flagged`, `action`), and `check_input(text)` runs every input guard.
+- [check.py](backend/guardrails/check.py): `run(name, text)` returns one finding (`guard`, `model`, `label`, `score`, `flagged`, `action`, and every label's `scores`), and `check_input(text)` runs every input guard.
 - The only guard today is `injection` (`protectai/deberta-v3-base-prompt-injection-v2`). Gmail's `safe()` runs the same guard on email subjects and snippets.
+- **Playground:** `POST /guardrails/check` runs policy guards and any other Hugging Face classifier ids on a text, so models can be compared side by side in Swagger (`/docs`). The first call to a model downloads it; gated repos like Llama Prompt Guard 2 need the license accepted and `hf auth login`.
 - Only the user message is checked. Tool and RAG output are not (that is a future `guard_output` node).
 - Messages scoring `>= 0.9` are blocked. Benign text containing words like "ignore" can score around 0.88, so the threshold stays high. The [guard eval](#evals) reports precision and recall at 0.5, 0.7 and 0.9.
 - A block emits a `guard` event naming the guard, logs a warning, flags the user message (`additional_kwargs["guard"]`, with every finding) and ends the turn with a refusal whose score sits in `response_metadata`. `without_blocked()` drops both from what the model sees on later turns; the checkpoint keeps them for history.
@@ -519,6 +520,8 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 | `GET` | `/jobs` | `?kind=&ref=&status=` | Recent jobs (chat, ingest, briefing), newest first; `status=running` finds one to reattach to |
 | `GET` | `/jobs/{id}` | | The job, and whether its events can still be followed |
 | `GET` | `/jobs/{id}/events` | `?after=` | SSE: every event so far, then live ones until the job ends; `404` once it is gone (10 minutes after finishing) |
+| `GET` | `/guardrails` | | The guards from `guardrails/policy.py` and the `input` order |
+| `POST` | `/guardrails/check` | `{text, guards?, models?}` | `{findings, models}`: each policy guard's finding with every label's score (all guards when `guards` is left out), and raw `{model, scores, ms}` for each extra model id; `400` for an unknown guard or a model that can't load |
 | `GET` | `/resume` | | `{tex, updated_at, has_pdf}`; the first call starts from the template |
 | `PUT` | `/resume` | `{tex}` | `{ok, log, tex, updated_at, has_pdf}`; saved only if it compiles, `log` holds the LaTeX error |
 | `GET` | `/resume/pdf` | | the compiled PDF, or `404` |
@@ -587,7 +590,7 @@ backend/
   main.py             FastAPI app, lifespan, CORS; lists each area's store and router
   mcp_servers.json    MCP servers loaded at startup
   core/               shared plumbing: config, db (connect, init_db), events, tracing
-  guardrails/         input guards: policy (models and thresholds), classify, check
+  guardrails/         input guards: policy (models and thresholds), classify, check, /guardrails playground
   jobs/               background jobs: runner, jobs table, /jobs
   integrations/       Google auth, Gmail, Calendar clients
   agent/              LangGraph graph, Ollama model capabilities, /models and /tools

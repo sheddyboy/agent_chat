@@ -14,6 +14,7 @@ from documents import store as documents_store
 from documents.router import router as documents_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from guardrails.router import router as guardrails_router
 from images.router import router as images_router
 from jobs import store as jobs_store
 from jobs.router import router as jobs_router
@@ -43,6 +44,7 @@ ROUTERS = (
     resume_router,
     weather_router,
     jobs_router,
+    guardrails_router,
 )
 
 
