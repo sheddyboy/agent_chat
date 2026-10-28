@@ -15,6 +15,7 @@ def run(name: str, text: str) -> dict:
         "score": score,
         "flagged": score >= guard["threshold"],
         "action": guard["action"],
+        "scores": {k: round(v, 4) for k, v in scores.items()},
     }
 
 
