@@ -22,21 +22,22 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     cors_origins: list[str] = ["http://localhost:3000"]
 
-    qdrant_path: str = "qdrant_data"
+    # Everything the app writes lives under data/ (gitignored); paths are relative to backend/
+    qdrant_path: str = "data/qdrant"
     qdrant_collection: str = "documents"
     embedding_model: str = "qwen3-embedding:0.6b"
     sparse_model: str = "Qdrant/bm25"
     chunk_size: int = 1000
     chunk_overlap: int = 150
-    upload_dir: str = "uploads"
-    image_dir: str = "uploads/images"  # chat images, sent to vision models, never ingested
+    upload_dir: str = "data/uploads"
+    image_dir: str = "data/uploads/images"  # chat images, sent to vision models, never ingested
     image_max_mb: int = 10
-    notes_dir: str = "notes"
-    db_path: str = "app.db"  # LangGraph checkpoints plus our own tables
+    notes_dir: str = "data/notes"
+    db_path: str = "data/app.db"  # LangGraph checkpoints plus our own tables
 
     mcp_config: str = "mcp_servers.json"
     mcp_workspace: str = (
-        "workspace"  # must match the filesystem root in mcp_servers.json
+        "data/workspace"  # must match the filesystem root in mcp_servers.json
     )
 
     # "attachments": a chat searches only its attached files (and has no search tool
@@ -52,7 +53,7 @@ class Settings(BaseSettings):
     stt_model: str = "nemo-parakeet-tdt-0.6b-v2"
     tts_voice: str = "af_heart"
     tts_speed: float = 1.0
-    voice_dir: str = "voice_models"  # Kokoro files, downloaded on first /voice/speak
+    voice_dir: str = "data/voice_models"  # Kokoro files, downloaded on first /voice/speak
 
     image_model: str = "stabilityai/sdxl-turbo"  # about 7 GB, downloaded on first draw
     image_vae: str = "madebyollin/sdxl-vae-fp16-fix"  # stays in fp16, see imagegen.py
@@ -60,8 +61,8 @@ class Settings(BaseSettings):
     image_unload_after_s: int = 300  # free the memory once drawing goes idle
 
     # OAuth client from Google Cloud (Desktop app) and the token the login saves
-    google_credentials: str = "secrets/credentials.json"
-    google_token: str = "secrets/token.json"
+    google_credentials: str = "data/secrets/credentials.json"
+    google_token: str = "data/secrets/token.json"
     # Calendar free_slots only looks inside these hours, local time
     work_day_start: str = "09:00"
     work_day_end: str = "18:00"
@@ -74,7 +75,7 @@ class Settings(BaseSettings):
     briefing_at: str = "07:00"
 
     # resume.tex, its compiled PDF and earlier versions; personal, so git ignores it
-    resume_dir: str = "resume"
+    resume_dir: str = "data/resume"
 
 
 settings = Settings()

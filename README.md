@@ -264,7 +264,7 @@ Local tools live in [backend/tools/](backend/tools/), one file each, registered 
 | `get_datetime` | Current local date, time and weekday | |
 | `calculator` | Safe arithmetic via an AST walker (`+ - * / // % **`) | |
 | `search_documents` | Hybrid search + rerank over uploaded documents | |
-| `save_note` | Writes a markdown note to `notes/` | yes |
+| `save_note` | Writes a markdown note to `data/notes/` | yes |
 | `generate_image` | Draws a 512x512 image with SDXL Turbo, stored like uploaded images | yes |
 | `web_search` | Tavily search, registered only when `TAVILY_API_KEY` is set | |
 
@@ -272,7 +272,7 @@ MCP servers are declared in [backend/mcp_servers.json](backend/mcp_servers.json)
 
 | Server | Launch | Notes |
 |---|---|---|
-| `filesystem` | `npx @modelcontextprotocol/server-filesystem workspace` | Rooted at `backend/workspace/`. `write_file`, `edit_file`, `move_file`, `create_directory` need approval. |
+| `filesystem` | `npx @modelcontextprotocol/server-filesystem data/workspace` | Rooted at `backend/data/workspace/`. `write_file`, `edit_file`, `move_file`, `create_directory` need approval. |
 | `fetch` | `uvx mcp-server-fetch` | Fetches a URL as markdown. |
 
 ```mermaid
@@ -294,7 +294,7 @@ MCP tools behave exactly like local ones: the agent binds them, `ToolNode` runs 
 
 ### Ingestion
 
-`POST /documents` saves the upload to `uploads/` and streams progress while [backend/ingestion/pipeline.py](backend/ingestion/pipeline.py) runs. Blocking work runs in a thread.
+`POST /documents` saves the upload to `data/uploads/` and streams progress while [backend/ingestion/pipeline.py](backend/ingestion/pipeline.py) runs. Blocking work runs in a thread.
 
 ```mermaid
 flowchart LR
@@ -419,7 +419,7 @@ The `done` event carries the `trace_id`, and the UI links to Phoenix's `/redirec
 
 ## Evals
 
-One suite per component in [backend/evals/](backend/evals/), on public or written datasets, with our own evaluators, all run as Phoenix experiments. Importing `evals` points Qdrant at a separate `eval_qdrant_data/` folder, so real uploads stay untouched and there is no lock clash with a running backend.
+One suite per component in [backend/evals/](backend/evals/), on public or written datasets, with our own evaluators, all run as Phoenix experiments. Importing `evals` points Qdrant at a separate `data/eval_qdrant/` folder, so real uploads stay untouched and there is no lock clash with a running backend.
 
 ```mermaid
 flowchart LR
@@ -505,18 +505,18 @@ Backend settings are in [backend/config.py](backend/config.py) (pydantic-setting
 | `phoenix_project` | `agent-chat` | |
 | `tavily_api_key` | empty | `web_search` is registered only when set |
 | `cors_origins` | `["http://localhost:3000"]` | |
-| `qdrant_path` / `qdrant_collection` | `qdrant_data` / `documents` | |
+| `qdrant_path` / `qdrant_collection` | `data/qdrant` / `documents` | |
 | `embedding_model` / `sparse_model` | `qwen3-embedding:0.6b` / `Qdrant/bm25` | |
 | `chunk_size` / `chunk_overlap` | `1000` / `150` | |
 | `retrieval_k` / `rerank_top_n` | `20` / `5` | |
 | `rerank_model` | `Xenova/ms-marco-MiniLM-L-6-v2` | |
 | `guard_model` / `guard_threshold` | `protectai/deberta-v3-base-prompt-injection-v2` / `0.9` | |
-| `upload_dir`, `notes_dir`, `db_path` | `uploads`, `notes`, `app.db` | |
-| `image_dir` / `image_max_mb` | `uploads/images` / `10` | Chat images, stored under a content hash, never ingested |
-| `mcp_config` / `mcp_workspace` | `mcp_servers.json` / `workspace` | The workspace must match the filesystem root in the JSON |
+| `upload_dir`, `notes_dir`, `db_path` | `data/uploads`, `data/notes`, `data/app.db` | |
+| `image_dir` / `image_max_mb` | `data/uploads/images` / `10` | Chat images, stored under a content hash, never ingested |
+| `mcp_config` / `mcp_workspace` | `mcp_servers.json` / `data/workspace` | The workspace must match the filesystem root in the JSON |
 | `stt_model` | `nemo-parakeet-tdt-0.6b-v2` | Any `onnx-asr` model name; English only by default |
 | `tts_voice` / `tts_speed` | `af_heart` / `1.0` | Kokoro voice names are listed in its VOICES.md |
-| `voice_dir` | `voice_models` | Kokoro files, downloaded on first use |
+| `voice_dir` | `data/voice_models` | Kokoro files, downloaded on first use |
 | `image_model` / `image_vae` | `stabilityai/sdxl-turbo` / `madebyollin/sdxl-vae-fp16-fix` | About 7 GB, downloaded to the Hugging Face cache on the first drawing |
 | `image_steps` | `2` | 1 to 4 for Turbo |
 | `image_unload_after_s` | `300` | Idle seconds before the image model is freed |
@@ -528,7 +528,7 @@ Frontend environment:
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` |
 | `NEXT_PUBLIC_PHOENIX_URL` | `http://localhost:6006` |
 
-Local data (`qdrant_data/`, `eval_qdrant_data/`, `uploads/`, `notes/`, `workspace/`, `voice_models/`, `*.db`, `.env`) is created inside `backend/` and gitignored.
+Everything the backend writes (SQLite, Qdrant, uploads, notes, the MCP workspace, voice models, the resume, Google secrets) lives in `backend/data/`, which is gitignored along with `.env`.
 
 ## Project layout
 

@@ -7,15 +7,8 @@ __pycache__/
 node_modules/
 .next/
 
-# Local data and secrets
+# Local data and secrets: everything the backend writes lives in backend/data/
 .env
-qdrant_data/
-eval_qdrant_data/
-uploads/
-notes/
+/backend/data/
 *.db
 *.db-*
-workspace/
-voice_models/
-secrets/
-/backend/resume/
