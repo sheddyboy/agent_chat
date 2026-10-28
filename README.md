@@ -13,6 +13,7 @@ It is a working showcase of:
 - **Voice**: local speech to text (Parakeet) and text to speech (Kokoro) on onnxruntime
 - **Draw**: the agent can generate images with SDXL Turbo on the Mac's GPU, shown inline in the answer
 - **Overview**: a home page with today's schedule, inbox, weather, recent chats and system status; chat lives at `/c`
+- **Briefing**: a daily page with what needs attention, today's (and in the evening tomorrow's) calendar, the mail worth a look and the weather; written on first open, with past days and follow-up questions on the page
 - **Resume**: an Overleaf-style LaTeX editor (Jake's Resume) with a live PDF preview, compiled locally with Tectonic; the agent can read and edit it behind an approval
 - **Live event streaming** over SSE: tokens, reasoning, node and tool steps, retrieval hits, approvals
 - **Observability and evals** with Phoenix: every chat is a trace, every eval suite is an experiment
@@ -459,6 +460,9 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 | `POST` | `/chat/{thread_id}/resume` | `{"action": "approve" \| "reject"}` | SSE stream, or `409` with no pending approval |
 | `POST` | `/documents` | multipart `file` | SSE stream of `ingestion` events, then `done` |
 | `GET` | `/documents/{doc_id}` | | `{doc_id, chunks}` |
+| `POST` | `/briefing` | | Writes today's briefing (replacing an earlier one) and returns it like `GET /briefing/{day}`; takes 15 to 45 s |
+| `GET` | `/briefing` | | `[{day, created_at}]`, newest first |
+| `GET` | `/briefing/{day}` | | `today` or `YYYY-MM-DD`: `{day, created_at, thread_id, heads_up, mail, mail_text, mail_note, today, tomorrow, weather}`, or `404` |
 | `GET` | `/resume` | | `{tex, updated_at, has_pdf}`; the first call starts from the template |
 | `PUT` | `/resume` | `{tex}` | `{ok, log, tex, updated_at, has_pdf}`; saved only if it compiles, `log` holds the LaTeX error |
 | `GET` | `/resume/pdf` | | the compiled PDF, or `404` |

@@ -194,6 +194,12 @@ Backend slices are tested with `curl -N` before any frontend work.
   - [x] **20c. Chat tools.** `read_resume` and `edit_resume(find, replace)` (one exact match, recompiled, rolled back with the error if it breaks). `edit_resume` needs approval. Registered only when `tectonic` is on PATH.
   Done when: the page edits and compiles, a broken edit leaves the last good PDF, history restores, and "change X on my resume" in chat shows an approval card and then the change.
 
+- [x] **21. Briefing page.** The briefing becomes a page instead of a new chat.
+  - [x] **21a. Data and storage.** `briefing.collect()` keeps each part structured (today's events and free slots, tomorrow's events after 17:00, the last 24h of mail, the weather), reusing `overview.py`. The model writes only `## Heads up` and `## Mail worth a look`; events and weather are shown from the data. Mails go to the model numbered (`[3] id …`), because an 8B model copies "3" reliably but not a 16 character id; its `3 | why` lines are joined back to the mail rows in code, echoed senders and subjects are dropped, and at most 6 are kept. One briefing per day in the `briefings` table; regenerating replaces it and removes the old chat unless it has follow-ups. `GET /briefing`, `GET /briefing/{day}`, and `POST /briefing` returns the briefing.
+  - [x] **21b. Page.** `/briefing` writes today's briefing on first open with a staged loader, then shows Heads up, Today (live "now" line), Tomorrow, Weather and Mail cards; mail opens in Gmail and Ask hands a question to the follow-up box. Follow-ups stream on the page through `/chat` on the briefing's thread, and come back when the day is reopened. Past days in a side list (a select on phones). The timeline is shared with the Overview, which gets a Heads up strip. The sidebar's Briefing is now a link.
+  Done when: opening the page with none for today writes one, the cards show real data, a follow-up can open an email, past days load with their follow-ups, and regenerating does not pile up chats.
+  Known: the 8B model still lets some job alerts and course promotions into "Mail worth a look".
+
 ## Later ideas
 
 Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, `guard_output` node, rename and search chats, `@` mentions for documents, full-text context for small documents.
