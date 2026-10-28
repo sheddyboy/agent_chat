@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
+import { BriefingWidget } from "@/components/overview/briefing";
 import { InboxWidget } from "@/components/overview/inbox";
 import { RecentChatsWidget } from "@/components/overview/recent-chats";
 import { ResumeWidget } from "@/components/overview/resume";
@@ -50,12 +51,13 @@ export default function Overview() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <ScheduleWidget index={0} className="md:row-span-2 xl:col-span-2" />
-              <WeatherWidget index={1} />
-              <InboxWidget index={2} />
-              <RecentChatsWidget index={3} className="md:row-span-2 xl:col-span-2" />
-              <StatusWidget index={4} />
-              <ResumeWidget index={5} />
+              <BriefingWidget index={0} className="md:col-span-2 xl:col-span-3" />
+              <ScheduleWidget index={1} className="md:row-span-2 xl:col-span-2" />
+              <WeatherWidget index={2} />
+              <InboxWidget index={3} />
+              <RecentChatsWidget index={4} className="md:row-span-2 xl:col-span-2" />
+              <StatusWidget index={5} />
+              <ResumeWidget index={6} />
             </div>
           </div>
         </main>

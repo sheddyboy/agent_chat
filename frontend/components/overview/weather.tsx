@@ -30,7 +30,7 @@ const ICONS: [number, LucideIcon][] = [
   [99, CloudLightning],
 ];
 
-function SkyIcon({ code, className }: { code: number; className?: string }) {
+export function SkyIcon({ code, className }: { code: number; className?: string }) {
   const Icon = (ICONS.find(([max]) => code <= max) ?? ICONS[ICONS.length - 1])[1];
   return <Icon className={className} />;
 }
