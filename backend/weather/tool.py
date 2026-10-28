@@ -5,13 +5,15 @@ from weather.places import home_place
 from langchain_core.tools import tool
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+# Models often pass these instead of leaving `place` empty; "home" would otherwise geocode to Homyel, Belarus
+HOME_WORDS = {"home", "my home", "here", "my location", "current location"}
 
 
 def pick_day(day: str, days: list[dict]) -> dict | None:
     """"today", "tomorrow", a weekday (the next one) or a YYYY-MM-DD date, from the 7-day list."""
     word = day.strip().lower()
     today = date.fromisoformat(days[0]["date"])
-    if word in ("", "today"):
+    if word in ("", "today", "now", "tonight"):
         target = today
     elif word == "tomorrow":
         target = today + timedelta(days=1)
@@ -32,6 +34,8 @@ def get_weather(place: str = "", day: str = "") -> str:
     place: a town or city, like "Leicester"; empty means the user's Home place.
     day: "today", "tomorrow", a weekday like "saturday", or a date like "2026-11-02"; empty means now and today.
     """
+    if place.strip().lower() in HOME_WORDS:
+        place = ""
     if place.strip():
         matches = openmeteo.search(place.strip())
         if not matches:
