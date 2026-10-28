@@ -200,6 +200,12 @@ Backend slices are tested with `curl -N` before any frontend work.
   Done when: opening the page with none for today writes one, the cards show real data, a follow-up can open an email, past days load with their follow-ups, and regenerating does not pile up chats.
   Known: the 8B model still lets some job alerts and course promotions into "Mail worth a look".
 
+- [x] **22. Weather.** Weather like a weather app, for any place, updating through the day.
+  - [x] **22a. Forecast and places.** `weather.py` makes one Open-Meteo call for now, 24 hours, 7 days and 15-minute rain (mph, local time), cached 10 minutes per place. The summary line ("Rain likely 15:00 to 18:00") and the rain alert ("Rain starting around 15:30", only within the hour) are worked out in code. Saved places in a `places` table with one Home, seeded from `weather_lat/lon` and `weather_place`; search through Open-Meteo geocoding. `/weather` routes. The Overview and briefing use Home's forecast. `get_weather(place, day)` chat tool.
+  - [x] **22b. Weather page.** `/weather`: place chips with Home, search with suggestions, My location (browser geolocation), now with feels like and the summary, a sideways 24-hour strip with sunrise and sunset and rain bars, 7 days with low to high bars on one scale, and wind, humidity, UV and sun tiles. Refreshes every 15 minutes and on focus. Night icons after dark.
+  - [x] **22c. Overview and briefing.** The Overview card shows the next 6 hours with icons and rain chances and links to the page; a rain banner sits above the Overview when an alert is due. Today's briefing shows the live card; past days keep their snapshot "as of" when written.
+  Done when: search, save, switch and Home work; the page and cards show live data and update; the banner shows for a place with rain coming; "will it rain in X on Saturday" in chat uses `get_weather`.
+
 ## Later ideas
 
 Deep research subgraph, long-term memory, conversation branching, artifacts pane, voice input/output, `guard_output` node, rename and search chats, `@` mentions for documents, full-text context for small documents.

@@ -14,6 +14,7 @@ It is a working showcase of:
 - **Draw**: the agent can generate images with SDXL Turbo on the Mac's GPU, shown inline in the answer
 - **Overview**: a home page with today's schedule, inbox, weather, recent chats and system status; chat lives at `/c`
 - **Briefing**: a daily page with what needs attention, today's (and in the evening tomorrow's) calendar, the mail worth a look and the weather; written on first open, with past days and follow-up questions on the page
+- **Weather**: a weather app page with saved places and search, now, the next 24 hours, 7 days, wind, humidity, UV and sun times, refreshed every 15 minutes; rain alerts from 15-minute data on the Overview, and a `get_weather` chat tool (Open-Meteo, no key)
 - **Resume**: an Overleaf-style LaTeX editor (Jake's Resume) with a live PDF preview, compiled locally with Tectonic; the agent can read and edit it behind an approval
 - **Live event streaming** over SSE: tokens, reasoning, node and tool steps, retrieval hits, approvals
 - **Observability and evals** with Phoenix: every chat is a trace, every eval suite is an experiment
@@ -463,6 +464,12 @@ Each suite prints mean scores to the terminal; the per-example runs and comparis
 | `POST` | `/briefing` | | Writes today's briefing (replacing an earlier one) and returns it like `GET /briefing/{day}`; takes 15 to 45 s |
 | `GET` | `/briefing` | | `[{day, created_at}]`, newest first |
 | `GET` | `/briefing/{day}` | | `today` or `YYYY-MM-DD`: `{day, created_at, thread_id, heads_up, mail, mail_text, mail_note, today, tomorrow, weather}`, or `404` |
+| `GET` | `/weather` | `?place_id=` or `?lat=&lon=` | Home's forecast when neither: `{place, current, hourly (24), daily (7), minutely, summary, alert, fetched_at}`; cached 10 minutes |
+| `GET` | `/weather/alert` | | `{alert, place}` for Home; `alert` is null when no rain starts or stops within the hour |
+| `GET` | `/weather/search` | `?q=` | Up to 8 `{name, region, country, lat, lon}` |
+| `GET/POST` | `/weather/places` | `{name, region, country, lat, lon}` | Saved places; the first becomes Home |
+| `POST` | `/weather/places/{id}/home` | | Makes it Home |
+| `DELETE` | `/weather/places/{id}` | | Removes it; `400` for Home |
 | `GET` | `/resume` | | `{tex, updated_at, has_pdf}`; the first call starts from the template |
 | `PUT` | `/resume` | `{tex}` | `{ok, log, tex, updated_at, has_pdf}`; saved only if it compiles, `log` holds the LaTeX error |
 | `GET` | `/resume/pdf` | | the compiled PDF, or `404` |
