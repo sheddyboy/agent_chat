@@ -3,7 +3,7 @@ from typing import Literal
 
 from jobs import runner
 from core.config import settings
-from core.db import get_thread, touch_thread
+from threads.store import get_thread, touch_thread
 from documents.store import get_document
 from fastapi import APIRouter, HTTPException, Request
 from images.store import image_path

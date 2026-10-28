@@ -1,6 +1,6 @@
-from core.db import delete_thread, get_thread, list_threads
+from threads.store import delete_thread, get_thread, list_threads
 from fastapi import APIRouter, HTTPException, Request
-from history import to_ui_messages
+from threads.history import to_ui_messages
 
 router = APIRouter(prefix="/threads", tags=["threads"])
 

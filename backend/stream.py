@@ -1,6 +1,6 @@
 import time
 
-from core.db import set_title
+from threads.store import set_title
 from core.events import event
 from langchain_core.messages import AIMessageChunk
 from openinference.instrumentation import using_session
