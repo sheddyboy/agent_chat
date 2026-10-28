@@ -4,7 +4,7 @@ import { CalendarClock, CalendarDays, Mail, MessageCircleQuestion, Sparkles, Sun
 import { Streamdown } from "streamdown";
 import { Card, Empty } from "@/components/overview/card";
 import { Timeline } from "@/components/overview/timeline";
-import { SkyIcon } from "@/components/overview/weather";
+import { SkyIcon } from "@/components/weather/sky-icon";
 import type { Briefing } from "@/components/briefing/types";
 
 // What needs attention, written by the model

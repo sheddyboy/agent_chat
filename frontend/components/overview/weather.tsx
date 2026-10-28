@@ -1,6 +1,7 @@
 "use client";
 
-import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Sun, type LucideIcon } from "lucide-react";
+import { Sun } from "lucide-react";
+import { SkyIcon } from "@/components/weather/sky-icon";
 import { Card, Empty, useCountUp, useWidget } from "@/components/overview/card";
 
 type Weather =
@@ -15,25 +16,6 @@ type Weather =
       rain: number;
       hourly: { time: string; temp: number }[];
     };
-
-// WMO weather code to an icon, by the ranges Open-Meteo documents
-const ICONS: [number, LucideIcon][] = [
-  [0, Sun],
-  [2, CloudSun],
-  [3, Cloud],
-  [48, CloudFog],
-  [57, CloudDrizzle],
-  [67, CloudRain],
-  [77, CloudSnow],
-  [82, CloudRain],
-  [86, CloudSnow],
-  [99, CloudLightning],
-];
-
-export function SkyIcon({ code, className }: { code: number; className?: string }) {
-  const Icon = (ICONS.find(([max]) => code <= max) ?? ICONS[ICONS.length - 1])[1];
-  return <Icon className={className} />;
-}
 
 // The next hours as a soft line with a fill under it, drawn in the text colour
 function Sparkline({ temps }: { temps: number[] }) {
