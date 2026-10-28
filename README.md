@@ -268,7 +268,7 @@ sequenceDiagram
 | `image` | `image_id`, `prompt` | `custom`, from `generate_image` |
 | `ingestion` | `doc_id`, `stage` (load / chunk / embed / store), `done`, `total` | ingestion pipeline |
 | `interrupt` | `tool_calls`, `thread_id` | `__interrupt__` update |
-| `guard` | `blocked`, `score` | `custom`, from `guard_input` |
+| `guard` | `blocked`, `guard`, `label`, `score` | `custom`, from `guard_input`; `blocked: false` for a warn guard |
 | `stage` | `stage` (`gathering`, `writing`) | briefing |
 | `briefing` | `briefing` | briefing, the finished page data |
 | `title` | `title`, `thread_id` | a new chat's generated title, before `done` |
@@ -396,11 +396,21 @@ sequenceDiagram
 
 - [policy.py](backend/guardrails/policy.py) holds the guards as plain data: model, the labels that count as a hit, threshold and action. `INPUT` lists the guards each user message goes through. Swapping a model is a one line change there; labels come from the model's own `id2label`.
 - [check.py](backend/guardrails/check.py): `run(name, text)` returns one finding (`guard`, `model`, `label`, `score`, `flagged`, `action`, and every label's `scores`), and `check_input(text)` runs every input guard.
-- The only guard today is `injection` (`protectai/deberta-v3-base-prompt-injection-v2`). Gmail's `safe()` runs the same guard on email subjects and snippets.
+- Guards today, in `INPUT` order:
+
+  | Guard | Model | Flags | Threshold | Action |
+  |---|---|---|---|---|
+  | `injection` | `protectai/deberta-v3-base-prompt-injection-v2` | `INJECTION` | 0.9 | block |
+  | `hate` | `facebook/roberta-hate-speech-dynabench-r4-target` | `hate` | 0.9 | block |
+  | `threat` | `unitary/toxic-bert` | `threat` | 0.7 | block |
+  | `toxicity` | `unitary/toxic-bert` | `insult`, `severe_toxic`, `identity_hate` | 0.7 | warn |
+
+  toxic-bert's catch-all `toxic` label is left out: venting like "this damn bug" scores 0.87 on it. Its `identity_hate` gave a plain slur only 0.38, which is why hate has its own model. Real threats scored about 0.76 against 0.55 for "kill this bug", so the threat margin is narrow. Gmail's `safe()` runs only the `injection` guard on email subjects and snippets.
+- **block** refuses the turn (below). **warn** lets the model answer, emits a `guard` event with `blocked: false`, and stores the findings on the user message so a reloaded thread still shows the amber flag.
 - **Playground:** `POST /guardrails/check` runs policy guards and any other Hugging Face classifier ids on a text, so models can be compared side by side in Swagger (`/docs`). The first call to a model downloads it; gated repos like Llama Prompt Guard 2 need the license accepted and `hf auth login`.
 - Only the user message is checked. Tool and RAG output are not (that is a future `guard_output` node).
 - Messages scoring `>= 0.9` are blocked. Benign text containing words like "ignore" can score around 0.88, so the threshold stays high. The [guard eval](#evals) reports precision and recall at 0.5, 0.7 and 0.9.
-- A block emits a `guard` event naming the guard, logs a warning, flags the user message (`additional_kwargs["guard"]`, with every finding) and ends the turn with a refusal whose score sits in `response_metadata`. `without_blocked()` drops both from what the model sees on later turns; the checkpoint keeps them for history.
+- A block emits a `guard` event (`guard`, `label`, `score`), logs a warning, flags the user message (`additional_kwargs["guard"]`, with every finding) and ends the turn with a refusal whose score sits in `response_metadata`. `without_blocked()` drops both from what the model sees on later turns; the checkpoint keeps them for history.
 
 ## Frontend
 

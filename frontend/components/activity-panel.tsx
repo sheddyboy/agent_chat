@@ -62,10 +62,12 @@ export function ActivityPanel({ events }: { events: ChatEvent[] }) {
             }
             case "guard":
               return (
-                <li key={i} className={`relative ${e.blocked ? "text-destructive" : "text-muted-foreground"}`}>
-                  <Dot color={e.blocked ? "bg-destructive" : "bg-muted-foreground/40"} />
-                  {e.blocked ? "Blocked" : "Passed"} by input guard
-                  <span className="ml-1 font-mono text-xs">({e.score as number})</span>
+                <li key={i} className={`relative ${e.blocked ? "text-destructive" : "text-amber-600 dark:text-amber-400"}`}>
+                  <Dot color={e.blocked ? "bg-destructive" : "bg-amber-500"} />
+                  {e.blocked ? "Blocked" : "Flagged"} by {(e.guard as string) ?? "input"} guard
+                  <span className="ml-1 font-mono text-xs">
+                    ({e.label ? `${e.label} ` : ""}{e.score as number})
+                  </span>
                 </li>
               );
             case "interrupt":

@@ -85,29 +85,44 @@ def without_blocked(messages: list) -> list:
     ]
 
 
+def guard_event(finding: dict, blocked: bool) -> dict:
+    return {
+        "type": "guard",
+        "blocked": blocked,
+        "guard": finding["guard"],
+        "label": finding["label"],
+        "score": round(finding["score"], 3),
+    }
+
+
 def guard_input(state: ChatState) -> Command:
     last = state.get("messages", [])[-1]
     result = check_input(last.text)
-    if not result["blocked"]:
+    hits = [f for f in result["findings"] if f["flagged"]]
+    if not hits:
         return Command(goto="agent")
-    hit = next(f for f in result["findings"] if f["flagged"] and f["action"] == "block")
+    # Stored on the message; a copy with the same id replaces it via add_messages
+    flag = {"blocked": result["blocked"], "findings": result["findings"]}
+    writer = get_stream_writer()
+    if not result["blocked"]:
+        # Warn guards only: the model still answers, the UI and history show the flag
+        for hit in hits:
+            logger.info("flagged by %s guard (%s %.3f)", hit["guard"], hit["label"], hit["score"])
+            writer(guard_event(hit, blocked=False))
+        flagged = last.model_copy(update={"additional_kwargs": {**last.additional_kwargs, "guard": flag}})
+        return Command(goto="agent", update={"messages": [flagged]})
+    hit = next(f for f in hits if f["action"] == "block")
     score = round(hit["score"], 3)
     logger.warning("blocked by %s guard (score %.3f): %r", hit["guard"], score, last.text[:200])
-    get_stream_writer()({"type": "guard", "blocked": True, "guard": hit["guard"], "score": score})
-    # Same id, so add_messages replaces the message with this flagged copy
+    writer(guard_event(hit, blocked=True))
     flagged = last.model_copy(
-        update={
-            "additional_kwargs": {
-                **last.additional_kwargs,
-                "guard": {"blocked": True, "score": score, "findings": result["findings"]},
-            }
-        }
+        update={"additional_kwargs": {**last.additional_kwargs, "guard": {**flag, "score": score}}}
     )
     # The refusal keeps thread history coherent: every user turn gets a reply.
     # guard_score is what history and without_blocked look for
     refusal = AIMessage(
         f"Blocked: this message was flagged by the {hit['guard']} guard ({hit['label']}).",
-        response_metadata={"guard_score": score, "guard": hit["guard"]},
+        response_metadata={"guard_score": score, "guard": hit["guard"], "guard_label": hit["label"]},
     )
     return Command(goto=END, update={"messages": [flagged, refusal]})
 
