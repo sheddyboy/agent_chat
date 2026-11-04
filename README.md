@@ -165,7 +165,7 @@ The mail and calendar tools, the Overview's inbox and schedule, and the briefing
 1. In Google Cloud, create a project, turn on the Gmail API and the Google Calendar API, and create an OAuth client of type Desktop app.
 2. Save its JSON as `backend/data/secrets/credentials.json`.
 3. Log in once from `backend/`: `uv run python -m integrations.google_auth`. This saves `data/secrets/token.json`.
-4. Set the OAuth app to In production (unverified is fine for personal use), or Google expires the login after 7 days.
+4. Set the OAuth app to In production (unverified is fine for personal use), or Google expires the login after 7 days. Publishing needs the Branding page filled in: the repo URL works as the homepage and [PRIVACY.md](PRIVACY.md) as the privacy policy link. Log in again after publishing, since a token from Testing mode still expires.
 
 Restart the backend and the tools appear. The details and limits of each tool are in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
