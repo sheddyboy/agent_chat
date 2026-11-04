@@ -1,10 +1,10 @@
 "use client";
 
 import { Mail } from "lucide-react";
-import { Card, Empty, useCountUp, useWidget } from "@/components/overview/card";
+import { Card, Empty, Relogin, useCountUp, useWidget } from "@/components/overview/card";
 
 type Inbox =
-  | { connected: false }
+  | { connected: false; expired?: true }
   | { connected: true; unread: number; mails: { id: string; from: string; subject: string; date: string }[] };
 
 // "16:20" for today, "Mon" for earlier this week
@@ -22,7 +22,7 @@ export function InboxWidget({ index, className }: { index: number; className?: s
   if (!data || !data.connected)
     return (
       <Card title="Inbox" icon={Mail} index={index} loading={!data && !error} error={error} className={className}>
-        <Empty>Gmail is not connected.</Empty>
+        {data?.connected === false && data.expired ? <Relogin /> : <Empty>Gmail is not connected.</Empty>}
       </Card>
     );
 

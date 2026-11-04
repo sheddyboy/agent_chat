@@ -69,6 +69,16 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="text-sm text-muted-foreground">{children}</p>;
 }
 
+// Shown when the saved Google token no longer refreshes
+export function Relogin() {
+  return (
+    <Empty>
+      Google login expired. Run <code className="font-mono text-xs">uv run python -m integrations.google_auth</code> in
+      backend/ and restart.
+    </Empty>
+  );
+}
+
 // The shell every widget shares: title row, then loading, error or content.
 // `index` staggers the entrance so the cards arrive one after another.
 export function Card({
