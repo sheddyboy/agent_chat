@@ -396,7 +396,7 @@ sequenceDiagram
 
 - [policy.py](backend/guardrails/policy.py) holds the guards as plain data: model, the labels that count as a hit, threshold and action. `INPUT` lists the guards each user message goes through. Swapping a model is a one line change there; labels come from the model's own `id2label`.
 - [check.py](backend/guardrails/check.py): `run(name, text)` returns one finding (`guard`, `model`, `label`, `score`, `flagged`, `action`, and every label's `scores`), and `check_input(text)` runs every input guard.
-- Guards today, in `INPUT` order:
+- The guards defined, in order. Only `injection` is in `INPUT` for now; the rest stay defined (the playground and evals use them) and come back by restoring the commented list in `policy.py`:
 
   | Guard | Model | Flags | Threshold | Action |
   |---|---|---|---|---|
@@ -406,7 +406,7 @@ sequenceDiagram
   | `toxicity` | `unitary/toxic-bert` | `insult`, `severe_toxic`, `identity_hate` | 0.7 | warn |
   | `pii` | `iiiorg/piiranha-v1-detect-personal-information` + regex | card, account, social, tax, ID card and driver's license numbers, passwords | 0.8 | redact |
 
-  toxic-bert's catch-all `toxic` label is left out: venting like "this damn bug" scores 0.87 on it. Its `identity_hate` gave a plain slur only 0.38, which is why hate has its own model. Real threats scored about 0.76 against 0.55 for "kill this bug", so the threat margin is narrow. Gmail's `safe()` runs only the `injection` guard on email subjects and snippets.
+  toxic-bert's catch-all `toxic` label is left out: venting like "this damn bug" scores 0.87 on it. Its `identity_hate` gave a plain slur only 0.38, which is why hate has its own model. Real threats scored about 0.76 against 0.55 for "kill this bug", so the threat margin is narrow. Mail and calendar text is not guarded: it comes from the user's own account.
 - **PII** is a span guard ([pii.py](backend/guardrails/pii.py)): a token-classification model marks words, scanning long text in overlapping 512-token windows, and regex adds card numbers that pass the Luhn check and IBANs. Only numbers the assistant never needs are redacted; names, cities, emails and phones pass so tools keep working. **redact** stores the redacted text on the user message, and `with_redactions()` sends the model `[CREDITCARDNUMBER]`-style placeholders while the checkpoint keeps what the user typed. A redacted first message is also titled from its redacted text.
 - **Known limits.** The injection guard runs on the raw text and blocks most messages that *disclose* a secret ("My card is 4111...", "My password is ...", both about 1.0); "Charge 4111... for the order" scores 0.05 and is redacted instead. Masking first doesn't help ("My password is ****" also scores 1.0), and skipping the injection guard when PII is present would let an attacker bypass it with a card number. Phoenix's top-level `chat` span still records the raw message; the LLM spans show the redacted text.
 - **block** refuses the turn (below). **warn** lets the model answer, emits a `guard` event with `blocked: false`, and stores the findings on the user message so a reloaded thread still shows the amber flag.

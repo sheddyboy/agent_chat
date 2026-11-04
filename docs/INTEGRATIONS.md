@@ -26,7 +26,6 @@ Rules for every integration:
     - `search_emails(since, query, unread_only, max_results)`: one tool for time ranges, search and unread. `since` accepts `24h`, `48h`, `7d`, `2w`, `1m`, `3m`, `1y` (also spelled out, like `1mo` or `2 weeks`), a range like `2026-10-01..2026-10-15` (end day included), or `""` for any time. `query` is free text or Gmail syntax (`from:bank`, `has:attachment`, `-category:promotions`). Returns one line per mail: id, date, sender, subject, unread flag, snippet, and whether more match.
     - `read_email(message_id)`: one email with headers, a Gmail link that opens in a new tab, and a cleaned body (HTML to text, quoted replies and signatures cut, links shortened to `[link: domain]`, capped at 4000 characters).
     - Overviews ("what happened in my email in the last 48h") come from the model summarizing a `search_emails` result. No separate insights tool.
-    - Subjects, snippets and bodies go through the injection guard; flagged ones are replaced with a short notice.
   - **Limitations**
     - One search returns at most 50 mails, newest first. About two days of my mail fits, so overviews of 24h or 48h see everything. A week or a month only sees the newest 50, and the model may summarize those as if they were the whole range. Narrow the query (a sender, `-category:promotions`) for longer ranges.
     - No exact stats (counts, top senders) over a range; the model only sees what one search returns.
@@ -45,7 +44,6 @@ Rules for every integration:
     - `list_events(when)`: events from all my calendars (including shared and holiday ones), one line each: day, time or "all day", title, calendar, location, meet link, up to 3 attendees plus a count, and "(declined)". `when` accepts `today`, `tomorrow`, `this week` (to Sunday), `next week`, a weekday like `friday` (the next one after today), `3d` or `2w` from now, a date, or a range like `2026-10-27..2026-10-29` (end day included).
     - `free_slots(when, min_minutes)`: gaps inside working hours (`work_day_start` and `work_day_end` in `config.py`, 09:00 to 18:00) between timed events on every calendar. Computed in Python, not by the model.
     - Meeting prep is the model chaining `list_events`, `search_emails` (a month of all mail) and `read_email`. No separate tool.
-    - Titles and locations go through the injection guard.
   - **Limitations**
     - At most 60 events per call, so a busy month gets cut; ask for a shorter range.
     - All-day events never block time in `free_slots`, even when marked busy (they are mostly reminders and birthdays). Weekends get working hours like weekdays.

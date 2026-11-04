@@ -46,5 +46,6 @@ GUARDS = {
     },
 }
 
-# Guards run on each user message, in order
-INPUT = ["injection", "hate", "threat", "toxicity", "pii"]
+# Guards run on each user message, in order. Only injection for now; the full list:
+# INPUT = ["injection", "hate", "threat", "toxicity", "pii"]
+INPUT = ["injection"]

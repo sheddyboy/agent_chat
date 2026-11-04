@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta
 from core.config import settings
 from googleapiclient.discovery import build
 
-from integrations.gmail import INVISIBLE, safe
+from integrations.gmail import INVISIBLE
 from integrations.google_auth import get_credentials
 
 WHEN_HELP = (
@@ -59,7 +59,7 @@ def calendars(cal) -> list[dict]:
 
 
 def clean(text: str) -> str:
-    return safe(" ".join(INVISIBLE.sub("", text).split()))
+    return " ".join(INVISIBLE.sub("", text).split())
 
 
 def to_row(ev: dict, calendar: str) -> dict:
