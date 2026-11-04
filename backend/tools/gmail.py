@@ -1,9 +1,8 @@
 from google.auth.exceptions import RefreshError
 from googleapiclient.errors import HttpError
 from integrations import gmail
+from integrations.google_auth import RELOGIN
 from langchain_core.tools import tool
-
-RELOGIN = "Gmail login has expired. Ask the user to run: uv run python -m integrations.google_auth"
 
 
 @tool

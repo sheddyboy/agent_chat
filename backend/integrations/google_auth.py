@@ -11,6 +11,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar.readonly",
 ]
 
+RELOGIN = "Google login has expired. Run from backend/: uv run python -m integrations.google_auth"
+
 
 def get_credentials() -> Credentials:
     """Load the saved token, refreshing it when it has expired."""
