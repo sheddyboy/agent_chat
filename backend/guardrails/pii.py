@@ -3,6 +3,8 @@ from functools import lru_cache
 
 from transformers import pipeline
 
+from guardrails.classify import GPU
+
 # Digits in groups, as people type card numbers; luhn() rejects the random ones
 CARD = re.compile(r"\b\d(?:[ -]?\d){12,18}\b")
 IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?\b")
@@ -30,8 +32,10 @@ def luhn(digits: str) -> bool:
 
 
 def model_spans(model: str, text: str) -> list[dict]:
+    with GPU:
+        found = tagger(model)(text)
     spans = []
-    for e in tagger(model)(text):
+    for e in found:
         start, end = e["start"], e["end"]
         while start < end and text[start] in EDGE:
             start += 1
