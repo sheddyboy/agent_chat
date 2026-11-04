@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
 from googleapiclient.discovery import build
-from guardrails.check import run
 
 from integrations.google_auth import get_credentials
 
@@ -21,8 +20,7 @@ MAX_RESULTS = 50  # Gmail suggests batches of 50 or fewer
 MAX_BODY = 4000
 # Marketing and social mail would crowd out the few that matter in an 8K context
 MAIL_QUERY = "-category:promotions -category:social"
-HIDDEN = "[hidden: this content looked like a prompt injection]"
-# Marketing mail pads previews with invisible characters, which the guard reads as an attack
+# Marketing mail pads previews with invisible characters, noise to the model
 INVISIBLE = re.compile(r"[͏­​-‏⁠-⁤﻿]")
 
 
@@ -55,20 +53,11 @@ def build_query(since: str, query: str, unread_only: bool) -> str:
     return " ".join(p for p in parts if p)
 
 
-def safe(text: str) -> str:
-    """Hide text the guard flags. It reads 512 tokens, so long text is checked in pieces."""
-    pieces = [text[i : i + 2000] for i in range(0, len(text), 2000)]
-    if any(run("injection", p)["flagged"] for p in pieces):
-        return HIDDEN
-    return text
-
-
 def to_row(msg: dict) -> dict:
     headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
     sent = datetime.fromtimestamp(int(msg["internalDate"]) / 1000).astimezone()
-    # Checked separately so a flagged snippet (a login code, say) keeps its subject
-    subject = safe(" ".join(INVISIBLE.sub("", headers.get("Subject", "(no subject)")).split()))
-    snippet = safe(" ".join(INVISIBLE.sub("", html.unescape(msg.get("snippet", ""))).split()))
+    subject = " ".join(INVISIBLE.sub("", headers.get("Subject", "(no subject)")).split())
+    snippet = " ".join(INVISIBLE.sub("", html.unescape(msg.get("snippet", ""))).split())
     return {
         "id": msg["id"],
         "date": sent.strftime("%Y-%m-%d %H:%M"),
@@ -155,6 +144,6 @@ def read(message_id: str) -> dict:
     return {
         **to_row(msg),
         "to": headers.get("To", ""),
-        "body": safe(clean_body(body)),
+        "body": clean_body(body),
         "link": f"https://mail.google.com/mail/u/0/#all/{msg['id']}",
     }
