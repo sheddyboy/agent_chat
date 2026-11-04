@@ -14,7 +14,8 @@ from overview import widgets
 from core.events import event
 from starlette.concurrency import run_in_threadpool
 from core.tracing import tracer
-from integrations.google_auth import has_scope
+from google.auth.exceptions import RefreshError
+from integrations.google_auth import RELOGIN, has_scope
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
 
@@ -51,6 +52,8 @@ MAIL_LINE = re.compile(r"^[\s*-]*[`\[]?(\d{1,2}|[0-9a-f]{12,})[`\]]?\s*\|\s*(.+)
 
 def today() -> dict:
     data = widgets.schedule()
+    if data.get("expired"):
+        raise RefreshError(RELOGIN)
     return {"events": data["events"], "free": data["free"]}
 
 
@@ -96,6 +99,8 @@ def collect() -> dict:
             continue
         try:
             data[name] = {"ok": True, **fetch()}
+        except RefreshError:
+            data[name] = {"ok": False, "note": RELOGIN}
         except Exception as e:
             logger.warning("briefing: %s failed: %s", name, e)
             data[name] = {"ok": False, "note": f"Unavailable ({type(e).__name__})."}

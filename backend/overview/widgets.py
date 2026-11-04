@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 import httpx
 from core.config import settings
+from google.auth.exceptions import RefreshError
 from documents.store import list_documents
 from weather.places import home_place
 from integrations.google_auth import has_scope
@@ -31,8 +32,11 @@ def schedule() -> dict:
         return {"connected": False}
     from integrations import google_calendar
 
-    rows, _ = google_calendar.list_events("today")
-    slots = google_calendar.free_slots("today", 30)
+    try:
+        rows, _ = google_calendar.list_events("today")
+        slots = google_calendar.free_slots("today", 30)
+    except RefreshError:
+        return {"connected": False, "expired": True}
     return {
         "connected": True,
         "events": [event(r) for r in rows],
@@ -45,8 +49,11 @@ def inbox() -> dict:
         return {"connected": False}
     from integrations import gmail
 
-    label = gmail.service().users().labels().get(userId="me", id="INBOX").execute()
-    rows, _ = gmail.search("7d", gmail.MAIL_QUERY, True, INBOX_ROWS)
+    try:
+        label = gmail.service().users().labels().get(userId="me", id="INBOX").execute()
+        rows, _ = gmail.search("7d", gmail.MAIL_QUERY, True, INBOX_ROWS)
+    except RefreshError:
+        return {"connected": False, "expired": True}
     mails = []
     for r in rows:
         name, address = parseaddr(r["from"])
